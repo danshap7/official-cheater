@@ -1,0 +1,856 @@
+# -----------------------------------------------------------------------------
+# Copyright (c) 2024-2025 Dan Shapiro
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# -----------------------------------------------------------------------------
+#
+# Prerequisites:
+#   You'll need to install openpyxl and pypdf via the command line
+#      pip install openpyxl
+#      pip install pypdf
+#
+# Known issues:
+#   - Unit Test file: ".\unittest\Test05b.pdf"
+#       This file has been updated with additional text from Adobe Pro (?)
+#       It does not parse the same as files straight out of Meet Manager
+#   - Session filter (-s) causes issues with merged sessions and sessions with
+#     alpha characters (eg. Session 1B)
+#
+# Verified .xlsx output on:
+#   - Office 365 Online Excel
+#   - Google Sheets
+#
+# Handles the following cases:
+#   1) One session per page
+#   2) Multiple sessions per page
+#   3) Session that spans more than a page
+#   4) Alpha characters in session numbers (eg. 1B, 1G)
+#   5) Single gender sessions
+#   6) Merging of single gender sessions
+#
+# Planned Updates:
+#   1) Need to search "GOTO"s and address
+#   2) Four hour rule detector
+# -----------------------------------------------------------------------------
+
+import argparse
+import re
+import sys
+from copy import copy
+from dataclasses import dataclass, field
+from datetime import datetime
+from importlib.metadata import version
+from itertools import islice
+from pathlib import Path
+
+# openpyxl and pypdf will need to be pip'd
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font
+    from openpyxl.styles.borders import Border, Side
+    from openpyxl.utils import get_column_letter
+    from pypdf import PdfReader
+
+except ModuleNotFoundError as e:
+    print(f'Library not found. Please install via "pip"\n{e}\n')
+    sys.exit(1)
+
+
+# -----------------------------------------------------------------------------
+
+timeFormat: str = "%I:%M %p"
+
+
+def shortTime(time: str) -> str:
+
+    # remove leading zeros
+    time = time.lstrip("0")
+
+    # swap A for AM and P for PM
+    time = time.replace(" AM", "A")
+    time = time.replace(" PM", "P")
+
+    return time
+
+
+def shortEvent(eventname: str) -> str:
+
+    lookup: dict[str, str] = {
+        "Butterfly": "Fly",
+        "Backstroke": "BK",
+        "Breaststroke": "BR",
+        "Freestyle": "FR",
+        "Medley": "Med",
+        "IM": "IM",
+    }
+
+    # returns None if eventname is not found
+    return lookup.get(eventname)
+
+
+def shortGender(gender: str) -> str:
+
+    lookup: dict[str, str] = {
+        "Girls": "W",
+        "Women": "W",
+        "Boys": "M",
+        "Men": "M",
+        "Mixed": "X",
+    }
+
+    # returns None if gender is not found
+    return lookup.get(gender)
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class SheetLine:
+    womensEventNum: str = ""
+    wommensHeatCount: str = ""
+    eventName: str = ""
+    mensEventNum: str = ""
+    mensHeatCount: str = ""
+    isNote: bool = False
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class CheatSheet:
+
+    lines: list[SheetLine] = field(default_factory=list)
+
+    def addLine(
+        self, womensEventNum, wommensHeatCount, eventName, mensEventNum, mensHeatCount
+    ):
+
+        s = SheetLine(
+            womensEventNum, wommensHeatCount, eventName, mensEventNum, mensHeatCount
+        )
+        self.lines.append(s)
+
+    def addNote(self, note):
+        s = SheetLine(eventName=note, isNote=True)
+        self.lines.append(s)
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class Event:
+    compType: str = ""
+    number: int = 0
+    gender: str = ""
+    ageGroup: str = ""
+    distance: int = 0
+    name: int = 0
+    totalEntries: int = 0
+    heatCount: int = 0
+    isRelay: bool = False
+    datetimeStart: datetime = datetime.now()
+
+    # if a break follows this event on the session report
+    breakFollows: bool = False
+    breakTime: int = 0
+
+    def attachBreak(self, t: int) -> None:
+        self.breakTime = t
+        self.breakFollows = True
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class Session:
+
+    def __init__(self, number, name):
+        self.number = number
+        self.name = name
+        self.day = 0
+        self.entries = 0
+        self.heats = 0
+        self.dayOfMeet = 0
+
+        # has been combined into another session
+        self.hasBeenMerged = False
+
+        # is the sum/merging of multiple sessions
+        self.mergedSession = False
+
+        self.datetimeFinish: datetime
+        self.datetimeStart: datetime
+
+        self.event = []
+
+    def addEvent(self, e: Event):
+        self.event.append(e)
+
+    def assembleCheatsheet(self):
+
+        cheat = CheatSheet()
+
+        eCount = iter(range(len(self.event)))
+        for i in eCount:
+
+            # this helps for odd number events in single gender session
+            compTo = (i + 1) if (i + 1) != len(self.event) else i
+
+            # is a mix event or a break?
+            if self.event[i].gender == "Mixed":
+
+                # mixed event
+                cheat.addLine(
+                    self.event[i].number,
+                    self.event[i].heatCount,
+                    f"{self.event[i].distance} Mixed "
+                    f"{shortEvent(self.event[i].name)}"
+                    f"{' R' if self.event[i].isRelay else ''}",
+                    "",
+                    "",
+                )
+
+            # single gender session / pool
+            elif self.event[i].gender == self.event[compTo].gender:
+
+                # left side (female)
+                if self.event[i].gender in ("Girls", "Women"):
+
+                    cheat.addLine(
+                        self.event[i].number,
+                        self.event[i].heatCount,
+                        f"{self.event[i].distance} "
+                        f"{shortEvent(self.event[i].name)}"
+                        f"{' R' if self.event[i].isRelay else ''}",
+                        "",
+                        "",
+                    )
+
+                else:  # right side (male)
+
+                    cheat.addLine(
+                        "",
+                        "",
+                        f"{self.event[i].distance} "
+                        f"{shortEvent(self.event[i].name)}"
+                        f"{' R' if self.event[i].isRelay else ''}",
+                        self.event[i].number,
+                        self.event[i].heatCount,
+                    )
+
+            elif (self.event[i].name == self.event[i + 1].name) and (
+                self.event[i].distance == self.event[i + 1].distance
+            ):
+
+                # pair up girls and boys events
+                cheat.addLine(
+                    self.event[i].number,
+                    self.event[i].heatCount,
+                    f"{self.event[i].distance} "
+                    f"{shortEvent(self.event[i].name)}"
+                    f"{' R' if self.event[i].isRelay else ''}",
+                    self.event[i + 1].number,
+                    self.event[i + 1].heatCount,
+                )
+
+                # skip the next index
+                next(islice(eCount, 1, 1), None)
+
+            else:
+                # diffent events for each gender
+                # eg. 1500 FR for women and 800 for men
+                # assumes women before men in this listing
+                # TODO - don't assume
+                cheat.addLine(
+                    self.event[i].number,
+                    self.event[i].heatCount,
+                    f"{self.event[i].distance} "
+                    f"{shortEvent(self.event[i].name)}"
+                    f"{' R' if self.event[i].isRelay else ''}",
+                    "",
+                    "",
+                )
+
+                cheat.addLine(
+                    "",
+                    "",
+                    f"{self.event[i+1].distance} "
+                    f"{shortEvent(self.event[i+1].name)}"
+                    f"{' R' if self.event[i+1].isRelay else ''}",
+                    self.event[i + 1].number,
+                    self.event[i + 1].heatCount,
+                )
+
+                next(islice(eCount, 1, 1), None)
+
+            # does a break follow the current event?
+            if self.event[compTo].breakFollows:
+                cheat.addNote(f"Break: {self.event[compTo].breakTime}-minutes")
+
+        # finish up with the start and end times
+        t1: str = shortTime(self.datetimeStart.strftime(timeFormat))
+        t2: str = shortTime(self.datetimeFinish.strftime(timeFormat))
+        cheat.addNote(f"Start: {t1} Finish: {t2}")
+
+        return cheat
+
+    def __str__(self):
+        return f" S{self.number} EventCout:{len(self.event)} {self.event}"
+
+
+# -----------------------------------------------------------------------------
+
+
+class Meet:
+
+    def __init__(self):
+        self.session = []
+        self.debug = False
+
+    def parseSessionReport(self, filename, enableDebug):
+        reader = PdfReader(filename)
+
+        eventRe = re.compile(
+            r"(Prelims|Finals|Finals-1|Finals-S)\s*"
+            r"(\d+).*"
+            r"(Girls|Women|Boys|Men|Mixed)\s*"
+            r"(\d+ & Under |\d+ & Over |\d+-\d+ )*"
+            r"(\d+) "
+            r"(Butterfly|Backstroke|Breaststroke|"
+            r"Freestyle|Medley|IM)"
+            r"( Relay)* "
+            r"(\d+)\s*"
+            r"(\d+)\s*"
+            r"[_]*\s*"
+            r"(\d{2}\:\d{2} (?:AM|PM))"
+        )
+
+        self.debug = enableDebug
+
+        # flag handles long sessions that span more than one page
+        startOfNewSession: bool = True
+
+        print(f"\nProcessing {filename}:")
+
+        # for each page
+        for i in range(len(reader.pages)):
+
+            # get a list of strings
+            pageList = reader.pages[i].extract_text().splitlines()
+
+            for pageLine in pageList:
+
+                print(f">> {pageLine}") if self.debug else None  # DEBUG
+
+                if self.debug:
+                    # handle possible ligatures with the FL in fly
+                    # this issues has only showed up in one session report
+                    if group := re.search(r"Butter ϐly", pageLine):
+                        print("\tFixing Bufferfly ligature")
+
+                    # handle space between B*oys
+                    if group := re.search(r"B oys", pageLine):
+                        print("\tFixing space in gender - Boys")
+
+                    # handle space between Gi*rls
+                    if group := re.search(r"Gi rls", pageLine):
+                        print("\tFixing space in gender - Girls")
+
+                # clean up line before processing
+                # maybe it's the pdf "printer", but we get some odd
+                # characters in our files front time to time
+                pageLine = re.sub(r"Butter ϐly", r"Butterfly", pageLine)
+                pageLine = re.sub(r"B oys", r"Boys", pageLine)
+                pageLine = re.sub(r"Gi rls", r"Girls", pageLine)
+
+                # new session
+                if group := re.search(r"Session: (\d+[^ ]*)\s(.+)", pageLine):
+
+                    currentNumber = group.group(1)
+                    currentName = group.group(2)
+
+                    # test whether we are continuing the session from
+                    # the previous page
+                    if startOfNewSession:
+                        self.session.append(Session(currentNumber, currentName))
+                        startOfNewSession = False
+
+                    print(f"   Page {i+1}, Session {currentNumber}")
+
+                if evMatch := re.search(eventRe, pageLine):
+
+                    print("NEW EVENT") if self.debug else None  # DEBUG
+
+                    startT: datetime = datetime.strptime(
+                        f"{evMatch.group(10)}", timeFormat
+                    )
+
+                    self.session[-1].addEvent(
+                        Event(
+                            evMatch.group(1),
+                            evMatch.group(2),
+                            evMatch.group(3),
+                            evMatch.group(4),
+                            evMatch.group(5),
+                            evMatch.group(6),
+                            evMatch.group(8),
+                            evMatch.group(9),
+                            evMatch.group(7) is not None,
+                            startT,
+                        )
+                    )
+
+                elif evMatch := re.search(r"Break: (\d+) Minutes", pageLine):
+
+                    self.session[-1].event[-1].attachBreak(evMatch.group(1))
+
+                elif evMatch := re.search(
+                    r"Entry / Heat Totals: (\d+) (\d+)", pageLine
+                ):
+                    self.session[-1].entries = evMatch.group(1)
+                    self.session[-1].heats = evMatch.group(2)
+
+                elif evMatch := re.search(
+                    r"Day of Meet: (\d+)\s+Starts at "
+                    r"(\d{2})\:(\d{2})\s?((?:AM|PM))",
+                    pageLine,
+                ):
+
+                    self.session[-1].datetimeStart = datetime.strptime(
+                        f"{evMatch.group(2)}"
+                        f":{evMatch.group(3)}"
+                        f" {evMatch.group(4)}",
+                        timeFormat,
+                    )
+
+                elif evMatch := re.search(
+                    r"Finish Time\D+(\d{2})\:(\d{2})\s(AM|PM)", pageLine
+                ):
+
+                    self.session[-1].datetimeFinish = datetime.strptime(
+                        f"{evMatch.group(1)}:"
+                        f"{evMatch.group(2)} "
+                        f"{evMatch.group(3)}",
+                        timeFormat,
+                    )
+
+                    # "Finish Time" is always at the end of a session
+                    # The next line read will be the beginning of a new session
+                    startOfNewSession = True
+
+                else:
+                    pass
+
+    def getLine(self, womens: str, mens: str) -> str:
+        seperator: str = "/"
+
+        if womens == "" or mens == "":
+            seperator = ""
+
+        return womens + seperator + mens
+
+    def makeCheatsheetXls(
+        self, outputFilename: str, sessionFilter: list[int], threeColumn: bool = False
+    ):
+
+        thinBorder = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
+        )
+
+        maxColumn = 3 if threeColumn else 5
+
+        fontStyle = Font(size="14")
+        fontStyleB = Font(size="14", bold=True)
+
+        wb = Workbook()
+
+        filteredSessions = (s for s in self.session if not s.hasBeenMerged)
+        for s in filteredSessions:
+
+            # skip sessions not in filter
+            if sessionFilter is not None:
+                if s.number not in sessionFilter:
+                    continue
+
+            rowCount = 1
+
+            wb.create_sheet(f"S{s.number}")
+            ws = wb[f"S{s.number}"]
+            if threeColumn:
+                ws.column_dimensions[get_column_letter(1)].width = 10
+                ws.column_dimensions[get_column_letter(2)].width = 16
+                ws.column_dimensions[get_column_letter(2)].width = 10
+            else:
+                ws.column_dimensions[get_column_letter(1)].width = 6
+                ws.column_dimensions[get_column_letter(2)].width = 6
+                ws.column_dimensions[get_column_letter(3)].width = 16
+                ws.column_dimensions[get_column_letter(4)].width = 6
+                ws.column_dimensions[get_column_letter(5)].width = 6
+
+            # header
+            if threeColumn:
+                ws.cell(row=1, column=1, value="W/M")
+                ws.cell(row=1, column=2, value=f"Session {s.number}")
+                ws.cell(row=1, column=3, value="W/M")
+            else:
+                ws.cell(row=1, column=1, value="W")
+                ws.cell(row=1, column=2, value="H")
+                ws.cell(row=1, column=3, value=f"Session {s.number}")
+                ws.cell(row=1, column=4, value="M")
+                ws.cell(row=1, column=5, value="H")
+
+            cs = s.assembleCheatsheet()
+
+            # all sessions
+            for index, line in enumerate(cs.lines, start=2):
+
+                # notes are on merged lines
+                if line.isNote:
+                    ws.merge_cells(
+                        start_row=index,
+                        start_column=1,
+                        end_row=index,
+                        end_column=maxColumn,
+                    )
+                    ws.cell(row=index, column=1, value=line.eventName)
+                    rowCount += 1
+                else:
+
+                    if threeColumn:
+                        ws.cell(
+                            row=index,
+                            column=1,
+                            value=self.getLine(line.womensEventNum, line.mensEventNum),
+                        )
+                        ws.cell(row=index, column=2, value=line.eventName)
+                        ws.cell(
+                            row=index,
+                            column=3,
+                            value=self.getLine(
+                                line.wommensHeatCount, line.mensHeatCount
+                            ),
+                        )
+                        rowCount += 1
+                    else:
+                        ws.cell(row=index, column=1, value=line.womensEventNum)
+                        ws.cell(row=index, column=2, value=line.wommensHeatCount)
+                        ws.cell(row=index, column=3, value=line.eventName)
+                        ws.cell(row=index, column=4, value=line.mensEventNum)
+                        ws.cell(row=index, column=5, value=line.mensHeatCount)
+                        rowCount += 1
+
+                # add border
+                for c in range(1, (maxColumn + 1)):
+
+                    # header row
+                    ws.cell(row=1, column=c).font = fontStyleB
+                    ws.cell(row=1, column=c).alignment = Alignment(
+                        horizontal="center", vertical="center"
+                    )
+
+                    # event and note rows
+                    for r in range(2, rowCount + 1):
+                        ws.cell(row=r, column=c).border = thinBorder
+                        ws.cell(row=r, column=c).alignment = Alignment(
+                            horizontal="center", vertical="center"
+                        )
+
+                        ws.cell(row=r, column=c).font = fontStyle
+
+                # add border around the whole thing
+
+        # We don't need or want the default worksheet.  It's easier to just
+        # delete it than renaming it.  Based off of user input, there may be
+        # a condition where we don't create any worksheets and that causes
+        # a exception when saving.  To prevent this we're only deleting the
+        # default sheet if we have created others.
+        if len(wb.worksheets) > 1:
+            wb.remove(wb["Sheet"])
+
+        # Save the file
+        wb.save(outputFilename)
+
+    def makeCheatsheetCsv(
+        self, outputFilename: str, sessionFilter: list[int], threeColumn: bool = False
+    ):
+
+        with open(outputFilename, "w") as out:
+
+            # skip saved, but merged sessions from printing
+            filteredSessions = (s for s in self.session if not s.hasBeenMerged)
+            for s in filteredSessions:
+
+                # skip sessions not in filter
+                if sessionFilter is not None:
+                    if s.number not in sessionFilter:
+                        continue
+
+                # header
+                out.write(f"---------- Session {s.number} ---------\n")
+                if threeColumn:
+                    out.write(f"W/M,Session {s.number},W/M\n")
+                else:
+                    out.write(f"W,H,Session {s.number},M,H\n")
+
+                cs = s.assembleCheatsheet()
+
+                # all sessions
+                for line in cs.lines:
+
+                    if threeColumn:
+                        l1 = self.getLine(line.womensEventNum, line.mensEventNum)
+                        l2 = self.getLine(line.wommensHeatCount, line.mensHeatCount)
+                        s = f"{l1}," f"{line.eventName}," f"{l2}\n"
+
+                    else:
+                        s = (
+                            f"{line.womensEventNum},"
+                            f"{line.wommensHeatCount},"
+                            f"{line.eventName},"
+                            f"{line.mensEventNum},"
+                            f"{line.mensHeatCount}\n"
+                        )
+
+                    out.write(s)
+
+    def mergeSessions(self, index1: int, index2: int):
+
+        newSession = Session(
+            self.session[index1].number + "+",
+            self.session[index1].name + self.session[index2].name,
+        )
+
+        # flag as a merged session
+        newSession.mergedSession = True
+
+        newSession.day = self.session[index1].day
+        newSession.entries = self.session[index1].entries + self.session[index2].entries
+        newSession.heats = self.session[index1].heats + self.session[index2].heats
+        newSession.dayOfMeet = self.session[index1].dayOfMeet
+
+        # assuming these start at the same time
+        newSession.datetimeStart = self.session[index1].datetimeStart
+
+        # pick the later of the two end times
+        newSession.datetimeFinish = max(
+            self.session[index1].datetimeFinish, self.session[index2].datetimeFinish
+        )
+
+        for i in range(len(self.session[index1].event)):
+            newSession.event.append(copy(self.session[index1].event[i]))
+            newSession.event[-1].breakFollows = False
+            newSession.event.append(copy(self.session[index2].event[i]))
+
+        self.session.insert(index1, newSession)
+
+        # save old sessions, but marked as merged.
+        # skipping them is faster and easier for this tool
+        self.session[index1 + 1].hasBeenMerged = True
+        self.session[index2 + 1].hasBeenMerged = True
+
+    def findMergableSessions(self):
+
+        sCount = iter(range(len(self.session) - 1))
+        for i in sCount:
+
+            matching = True
+
+            # the first step to comparing - do the number of events match
+            if len(self.session[i].event) == len(self.session[i + 1].event):
+
+                prelimsRe = re.compile(r"prelim", re.IGNORECASE)
+                finalsRe = re.compile(r"final", re.IGNORECASE)
+
+                # make sure we're not comparing prelims to finals
+                if prelimsRe.search(self.session[i].name) and finalsRe.search(
+                    self.session[i + 1].name
+                ):
+                    continue
+
+                # okay, lets compare event names and distances
+                for j in range(len(self.session[i].event)):
+                    matching = True
+
+                    if (
+                        self.session[i].event[j].name != self.session[i].event[j].name
+                    ) or (
+                        self.session[i].event[j].distance
+                        != self.session[i].event[j].distance
+                    ):
+                        matching = False
+                        break
+
+                # done comparing each event
+                if matching:
+                    print(
+                        f">> Merging Session {self.session[i].number} "
+                        f"and {self.session[i+1].number}"
+                    )
+
+                    self.mergeSessions(i, i + 1)
+
+                    # we have a matching pair i and i+1
+                    # we don't need to compare i+1 and i+2
+                    next(islice(sCount, 1, 1), None)
+
+    def printEventDurations(self, sessionFilter: list[int]):
+
+        unmergedSessions = (s for s in self.session if not s.mergedSession)
+
+        for s in unmergedSessions:
+
+            # skip sessions not in filter
+            if sessionFilter is not None:
+                if s.number not in sessionFilter:
+                    continue
+
+            print(f"\nSession {s.number}")
+            print("--------------------------------------")
+
+            for i in range(len(s.event)):
+
+                startTime = s.event[i].datetimeStart
+                # use session end for the final event stop time
+                if i == len(s.event) - 1:
+                    finishTime = s.datetimeFinish
+                else:
+                    finishTime = s.event[i + 1].datetimeStart
+
+                eventDuration: datetime = finishTime - startTime
+                deltaInMinuts: int = int(eventDuration.total_seconds() / 60)
+
+                print(
+                    f"{deltaInMinuts:02d}-min "
+                    f"E{s.event[i].number} "
+                    f"{shortGender(s.event[i].gender)} "
+                    f"{s.event[i].distance} {s.event[i].name}"
+                    f"{' R' if s.event[i].isRelay else ''}"
+                    f" (h={s.event[i].heatCount})"
+                )
+
+
+# -----------------------------------------------------------------------------
+def main():
+
+    parser: Object = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "timeline", help="Session report (timeline) " "as printed by Meet Manager"
+    )
+
+    parser.add_argument(
+        "-s",
+        "--sessions",
+        nargs="+",
+        type=str,
+        help="Session numbers to process from timeline",
+    )
+
+    parser.add_argument(
+        "-m",
+        "--mergeGeneders",
+        action="store_true",
+        help="Merge sessions of matching " "events in different geneder pools",
+    )
+
+    parser.add_argument(
+        "-o", "--outputFile", help="Output path and filename (without extension)"
+    )
+
+    parser.add_argument(
+        "-3",
+        "--simplified",
+        action="store_true",
+        help="Three column output - default is five",
+    )
+
+    parser.add_argument(
+        "-d",
+        "--duration",
+        action="store_true",
+        help="Print duration of each event " "in minutes on screen",
+    )
+
+    parser.add_argument(
+        "-csv",
+        action="store_true",
+        help="Output in Comma-Separated Value format " "instead of MS Excel",
+    )
+
+    parser.add_argument("--debug", action="store_true", help="Enable debug output")
+
+    args: Object = parser.parse_args()
+
+    # make sure we have a valid file entered
+    inputFile = Path(args.timeline)
+    if not inputFile.exists():
+        print(f"Error: Cannot open {inputFile}")
+        exit(-1)
+
+    # user select output filename and path
+    if args.outputFile is not None:
+        outputFile = Path(args.outputFile)
+
+    else:
+        # using the timeline filename as our output filename
+        p = Path(args.timeline)
+        outputFile = Path(p.parent, f"{p.stem}")
+
+    # version information
+    if args.debug:
+        print(f"python          {sys.version}")
+        print(f"module pypdf    {version('pypdf')}")
+        print(f"module openpyxl {version('openpyxl')}")
+
+    meet = Meet()
+    meet.parseSessionReport(inputFile, args.debug)
+
+    if args.sessions is not None:
+        print(f"   Parsing only sessions = {args.sessions}")
+
+    if args.mergeGeneders:
+        # This is when the meet is setup to have two different pools
+        # for each gender, but the events are the same.
+        # In this case we merge into a "single session" as if both
+        # genders are swimming in the same pool.
+        meet.findMergableSessions()
+
+    # .csv is a simplified output
+    # mainly used for unit testing
+    if args.csv:
+        print(f"Writing: {outputFile}.csv")
+        meet.makeCheatsheetCsv(
+            outputFile.parent / (outputFile.name + ".csv"),
+            args.sessions,
+            args.simplified,
+        )
+    else:
+        print(f"Writing: {outputFile}.xlsx")
+        meet.makeCheatsheetXls(
+            outputFile.parent / (outputFile.name + ".xlsx"),
+            args.sessions,
+            args.simplified,
+        )
+
+    if args.duration:
+        meet.printEventDurations(args.sessions)
+
+
+# -----------------------------------------------------------------------------
+if __name__ == "__main__":
+    main()
