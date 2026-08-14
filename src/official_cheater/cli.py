@@ -1,3 +1,5 @@
+"""Handles command-line arguements for the official-cheater set of tools."""
+
 import argparse
 from pathlib import Path
 
@@ -7,6 +9,12 @@ from .timeline import run_timeline
 
 
 def build_stamp_parser(subparsers):
+    """Build command-line options for stamp tools.
+
+    Args:
+        subparsers: Argument parser subparsers to which the stamp options
+            are added.
+    """
     parser = subparsers.add_parser("stamp", help="Merge PDF files together")
     parser.add_argument(
         "-b",
@@ -61,6 +69,12 @@ def build_stamp_parser(subparsers):
 
 
 def build_timeline_parser(subparsers):
+    """Build command-line options for timeline tools.
+
+    Args:
+        subparsers: Argument parser subparsers to which the timeline options
+            are added.
+    """
     parser = subparsers.add_parser("timeline", help="Analyze timeline")
     parser.add_argument(
         "-i", "--input", required=True, type=Path, help="Session report to be analyzed"
@@ -75,6 +89,12 @@ def build_timeline_parser(subparsers):
 
 
 def build_program_parser(subparsers):
+    """Build command-line options for meet program tools.
+
+    Args:
+        subparsers: Argument parser subparsers to which the meet program options
+            are added.
+    """
     parser = subparsers.add_parser(
         "program", help="Print meet program with combined heats"
     )
@@ -91,6 +111,7 @@ def build_program_parser(subparsers):
 
 
 def main():
+    """Main function for processing command-line arguements."""
     parser = argparse.ArgumentParser(description="Hy-Tek Helper")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
