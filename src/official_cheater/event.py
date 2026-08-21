@@ -13,7 +13,7 @@ class Event:
     gender: str = ""
     age_group: str = ""
     distance: int = 0
-    name: int = 0
+    stroke: str = ""
     total_entries: int = 0
     heat_count: int = 0
     is_relay: bool = False
@@ -27,3 +27,6 @@ class Event:
         """Tbd."""
         self.break_time = t
         self.break_follows = True
+
+    def __str__(self):
+        return f"E{self.number} {self.age_group} {self.distance} {self.stroke}"

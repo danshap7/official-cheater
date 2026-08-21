@@ -17,9 +17,7 @@ def build_stamp_parser(subparsers):
     """
     parser = subparsers.add_parser("stamp", help="Merge PDF files together")
     parser.add_argument(
-        "-b",
-        "--base",
-        required=True,
+        "base_file",
         type=Path,
         help="PDF onto which the overlay files are applied",
     )
@@ -76,9 +74,7 @@ def build_timeline_parser(subparsers):
             are added.
     """
     parser = subparsers.add_parser("timeline", help="Analyze timeline")
-    parser.add_argument(
-        "-i", "--input", required=True, type=Path, help="Session report to be analyzed"
-    )
+    parser.add_argument("input_file", type=Path, help="Session report to be analyzed")
     parser.add_argument(
         "-o",
         "--output",
@@ -98,14 +94,50 @@ def build_program_parser(subparsers):
     parser = subparsers.add_parser(
         "program", help="Print meet program with combined heats"
     )
-    parser.add_argument(
-        "-i", "--input", required=True, type=Path, help="Single column meet program"
-    )
+    parser.add_argument("input", type=Path, help="Single column meet program")
     parser.add_argument(
         "-o",
         "--output",
         type=Path,
         help="Combined heat meet program (default name is <input>+.pdf)",
+    )
+    parser.set_defaults(func=run_program)
+
+
+def build_pdf_tools_parser(subparsers):
+    """Build command-line options for pdf file processing.
+
+    Args:
+        subparsers: Argument parser subparsers to which the meet program options
+            are added.
+    """
+    parser = subparsers.add_parser("pdf", help="PDF file processsing")
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "-m", "--merge", help="Merge PDF files by listed name or directory"
+    )
+
+    parser.add_argument(
+        "-i",
+        "--input",
+        nargs="+",
+        type=Path,
+        help="Space-separated list of PDFs to PDF containing directories",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--recursive",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        help="Merged file output (default name is merge.pdf)",
     )
     parser.set_defaults(func=run_program)
 
@@ -119,6 +151,7 @@ def main():
     build_stamp_parser(subparsers)
     build_timeline_parser(subparsers)
     build_program_parser(subparsers)
+    build_pdf_tools_parser(subparsers)
 
     args = parser.parse_args()
 

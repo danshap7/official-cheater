@@ -117,7 +117,6 @@ def _get_overlay_transparencies(pages: list[Path]) -> list[PageObject]:
     overlays: list[PageObject] = []
 
     for page in pages:
-
         overlay_buffer = _make_transparent_overlay(page)
         overlay = PdfReader(overlay_buffer)
 
@@ -214,8 +213,8 @@ def process_arguements(args) -> None:
 
     # make sure all files are accessable
     # base file
-    if not args.base.exists():
-        missing_files.append(args.base)
+    if not args.base_file.exists():
+        missing_files.append(args.base_file)
 
     # overlay file(s) for every page
     missing_files.extend(f for f in args.overlay_all if not f.exists())
@@ -229,9 +228,7 @@ def process_arguements(args) -> None:
         # was found.  These should only be used with an overlay list for events
         if args.event_stamp is not None:
             error = True
-            print(
-                f"Error: '--{args.event_stamp}' " "found when 'overlay_event' was empty"
-            )
+            print(f"Error: '--{args.event_stamp}' found when 'overlay_event' was empty")
 
     # list any missing files
     if missing_files:
@@ -239,7 +236,7 @@ def process_arguements(args) -> None:
         print("Cannot open:", *missing_files, sep=", ")
 
     if error:
-        sys.exit()
+        sys.exit(1)
 
 
 def run_stamp(args):
@@ -257,12 +254,12 @@ def run_stamp(args):
     # name = base.stem + default_out _ base.suffix(extension)
     if args.output is None:
         # default name = base
-        b, e = (args.base.stem, args.base.suffix)
+        b, e = (args.base_file.stem, args.base_file.suffix)
 
         args.output = Path(f"{b}{default_out}{e}")
 
     stamp_first: bool = args.event_stamp == "first"
 
     stamp_file(
-        args.base, args.overlay_all, args.overlay_event, stamp_first, args.output
+        args.base_file, args.overlay_all, args.overlay_event, stamp_first, args.output
     )

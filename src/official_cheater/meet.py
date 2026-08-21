@@ -1,118 +1,114 @@
 """Tbd."""
 
-from pypdf import PageObject, PdfReader, PdfWriter
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from pypdf import PdfReader
+
 from . import report
+from .event import Event
+from .session import Session
 
 
 class Meet:
-
     def __init__(self):
-        self.session = []
         self.debug: bool = False
+        self.sessions: list[Session] = []
 
-    def parseSessionReport(self, filename: Path, enableDebug=False):
+    def parse_session_report(self, filename: Path, enableDebug=False):
         reader = PdfReader(filename)
 
         self.debug = enableDebug
 
         # flag handles long sessions that span more than one page
-        startOfNewSession: bool = True
+        new_session_start: bool = True
 
         print(f"\nProcessing {filename}:")
 
         # for each page
         for page in reader.pages:
-
             # get a list of strings
             page_lines: list[str] = page.extract_text().splitlines()
 
             for line in page_lines:
-
                 print(f">> {line}") if self.debug else None  # DEBUG
 
                 line = report.cleanup_line(line)
 
+                if match := report.SESSION_HEADER.search(line):
+                    number: str = match.group(1)
+                    name: str = match.group(2)
 
-"""
-                # new session
-                if group := re.search(r"Session: (\d+[^ ]*)\s(.+)", pageLine):
+                    # Test whether we are continuing the session from
+                    # the previous page.
+                    if new_session_start:
+                        self.sessions.append(Session(number, name))
+                        new_session_start = False
 
-                    currentNumber = group.group(1)
-                    currentName = group.group(2)
-
-                    # test whether we are continuing the session from
-                    # the previous page
-                    if startOfNewSession:
-                        self.session.append(Session(currentNumber, currentName))
-                        startOfNewSession = False
-
-                    print(f"   Page {i+1}, Session {currentNumber}")
-
-                if evMatch := re.search(eventRe, pageLine):
-
+                # capture every event listed for the session
+                elif match := report.TIMELINE_EVENT.search(line):
                     print("NEW EVENT") if self.debug else None  # DEBUG
 
-                    startT: datetime = datetime.strptime(
-                        f"{evMatch.group(10)}", timeFormat
+                    start_time: datetime = datetime.strptime(  # noqa: DTZ007
+                        f"{match.group(10)}", report.TIME_FORMAT
                     )
 
-                    self.session[-1].addEvent(
+                    self.sessions[-1].add_event(
                         Event(
-                            evMatch.group(1),
-                            evMatch.group(2),
-                            evMatch.group(3),
-                            evMatch.group(4),
-                            evMatch.group(5),
-                            evMatch.group(6),
-                            evMatch.group(8),
-                            evMatch.group(9),
-                            evMatch.group(7) is not None,
-                            startT,
+                            comp_type=match.group(1),
+                            number=int(match.group(2)),
+                            gender=match.group(3),
+                            age_group=match.group(4),
+                            distance=int(match.group(5)),
+                            stroke=match.group(6),
+                            total_entries=int(match.group(8)),
+                            heat_count=int(match.group(9)),
+                            is_relay=match.group(7) is not None,
+                            datetime_start=start_time,
                         )
                     )
 
-                elif evMatch := re.search(r"Break: (\d+) Minutes", pageLine):
+                # capture breaks in the timeline
+                elif match := report.TIMELINE_BREAK.search(line):
+                    self.sessions[-1].events[-1].attachBreak(match.group(1))
 
-                    self.session[-1].event[-1].attachBreak(evMatch.group(1))
+                # athlete and heat counts
+                elif match := report.TIMELINE_TOTALS.search(line):
+                    self.sessions[-1].entries = int(match.group(1))
+                    self.sessions[-1].heats = int(match.group(2))
 
-                elif evMatch := re.search(
-                    r"Entry / Heat Totals: (\d+) (\d+)", pageLine
-                ):
-                    self.session[-1].entries = evMatch.group(1)
-                    self.session[-1].heats = evMatch.group(2)
+                # session start time
+                elif match := report.TIMELINE_START_T.search(line):
+                    self.sessions[-1].datetimeStart = datetime.strptime(
+                        f"{match.group(2)}:{match.group(3)} {match.group(4)}",
+                        report.TIME_FORMAT,
+                    ).replace(tzinfo=ZoneInfo("America/Phoenix"))
 
-                elif evMatch := re.search(
-                    r"Day of Meet: (\d+)\s+Starts at "
-                    r"(\d{2})\:(\d{2})\s?((?:AM|PM))",
-                    pageLine,
-                ):
+                # session end time
+                elif match := report.TIMELINE_END_T.search(line):
+                    self.sessions[-1].datetimeFinish = datetime.strptime(
+                        f"{match.group(1)}:{match.group(2)} {match.group(3)}",
+                        report.TIME_FORMAT,
+                    ).replace(tzinfo=ZoneInfo("America/Phoenix"))
 
-                    self.session[-1].datetimeStart = datetime.strptime(
-                        f"{evMatch.group(2)}"
-                        f":{evMatch.group(3)}"
-                        f" {evMatch.group(4)}",
-                        timeFormat,
-                    )
+                    # "Finish Time" is always at the end of a session.  The
+                    #  next line read will be the beginning of a new session.
+                    #  This helps handle cases where the session timeline spans
+                    # multiple pages
+                    new_session_start = True
 
-                elif evMatch := re.search(
-                    r"Finish Time\D+(\d{2})\:(\d{2})\s(AM|PM)", pageLine
-                ):
+    def __str__(self):
+        return "Meet\n" + "\n".join(" " + str(session) for session in self.sessions)
 
-                    self.session[-1].datetimeFinish = datetime.strptime(
-                        f"{evMatch.group(1)}:"
-                        f"{evMatch.group(2)} "
-                        f"{evMatch.group(3)}",
-                        timeFormat,
-                    )
 
-                    # "Finish Time" is always at the end of a session
-                    # The next line read will be the beginning of a new session
-                    startOfNewSession = True
+def main():
+    m: Meet = Meet()
 
-                else:
-                    pass
-"""
+    m.parse_session_report(Path(r".\tests\timeline_001.pdf"))
+
+    print(m)
+
 
 if __name__ == "__main__":
-    pass
+    main()

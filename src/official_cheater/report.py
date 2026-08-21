@@ -48,7 +48,7 @@ SESSION_HEADER = re.compile(r"Session: (\d+[^ ]*)\s(.+)")
 # group 7: Relay (optional)
 # group 8: Athlete entries
 # group 9: Heat count
-TIMELINE_EV = re.compile(
+TIMELINE_EVENT = re.compile(
     r"(Prelims|Finals|Finals-1|Finals-S)\s*"
     r"(\d+).*"
     r"(Girls|Women|Boys|Men|Mixed)\s*"
@@ -62,6 +62,31 @@ TIMELINE_EV = re.compile(
     r"[_]*\s*"
     r"(\d{2}\:\d{2} (?:AM|PM))"
 )
+
+# group 1: Minutes for break
+TIMELINE_BREAK = re.compile(r"Break: (\d+) Minutes")
+
+# group 1: Athlete count
+# group 2: Heat count
+TIMELINE_TOTALS = re.compile(r"Entry / Heat Totals: (\d+) (\d+)")
+
+# group 1: Hour
+# group 2: Minute
+# group 3: Second
+# group 4: AM/PM
+TIMELINE_START_T = re.compile(
+    r"Day of Meet: (\d+)\s+Starts at " r"(\d{2})\:(\d{2})\s?((?:AM|PM))"
+)
+
+# group 1: Hour
+# group 2: Minute
+# group 3: Second
+# group 4: AM/PM
+TIMELINE_END_T = re.compile(r"Finish Time\D+(\d{2})\:(\d{2})\s(AM|PM)")
+
+
+# Time format used on reports
+TIME_FORMAT = r"%I:%M %p"
 
 
 def get_event_page_mapping(pdf_file: Path) -> dict[int, list[int]]:
@@ -84,7 +109,6 @@ def get_event_page_mapping(pdf_file: Path) -> dict[int, list[int]]:
 
         # loop through each line in the page
         for line in page_list:
-
             if match := EVENT_START.search(line):
                 new_ev = True
                 current_ev_num = int(match.group(1))
@@ -109,15 +133,15 @@ def cleanup_line(line: str) -> str:
     if _DEBUG:
         # handle possible ligatures with the FL in fly
         # this issues has only showed up in one session report
-        if group := re.search(r"Butter ϐly", line):
+        if re.search(r"Butter ϐly", line):
             print("\tFixing Bufferfly ligature")
 
         # handle space between B*oys
-        if group := re.search(r"B oys", line):
+        if re.search(r"B oys", line):
             print("\tFixing space in gender - Boys")
 
         # handle space between Gi*rls
-        if group := re.search(r"Gi rls", line):
+        if re.search(r"Gi rls", line):
             print("\tFixing space in gender - Girls")
 
     line = re.sub(r"Butter ϐly", r"Butterfly", line)

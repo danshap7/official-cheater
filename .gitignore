@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# adds for official-cheater behavior
+*.png
+*_STAMPED.pdf
