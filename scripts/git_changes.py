@@ -1,3 +1,4 @@
+import argparse
 import subprocess
 from pathlib import Path
 
@@ -25,6 +26,9 @@ def get_changed_files(repo: Path) -> list[Path]:
     return files
 
 
+SEPARATOR = "=" * 80
+
+
 def combine_files(repo: Path, output: Path) -> None:
     files = get_changed_files(repo)
 
@@ -32,14 +36,42 @@ def combine_files(repo: Path, output: Path) -> None:
         for file in files:
             relative = file.relative_to(repo)
 
-            combined.write(f"\n{'=' * 80}\n")
+            combined.write(f"\n{SEPARATOR}\n")
             combined.write(f"FILE: {relative}\n")
-            combined.write(f"{'=' * 80}\n\n")
+            combined.write(f"{SEPARATOR}\n\n")
 
             combined.write(file.read_text(encoding="utf-8"))
             combined.write("\n")
 
 
+def split_combined_file(combined: Path, repo: Path) -> None:
+    text = combined.read_text(encoding="utf-8")
+
+    marker = SEPARATOR + "\nFILE: "
+
+    sections = text.split(marker)
+
+    for section in sections[1:]:
+        relative, content = section.split(
+            "\n" + SEPARATOR + "\n\n",
+            maxsplit=1,
+        )
+
+        output = repo / relative
+
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(content.rstrip("\n") + "\n", encoding="utf-8")
+
+
 if __name__ == "__main__":
-    repo = Path(".")
-    combine_files(repo, Path("changed_files.txt"))
+    parser = argparse.ArgumentParser(description="git git'r")
+    parser.add_argument("location", type=Path)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--zip", type=Path)
+    group.add_argument("--unzip", type=Path)
+    args = parser.parse_args()
+
+    if args.zip:
+        combine_files(args.location, args.zip)
+    elif args.unzip:
+        split_combined_file(args.unzip, args.location)
