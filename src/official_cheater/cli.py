@@ -5,6 +5,7 @@ from pathlib import Path
 
 from official_cheater import debug
 
+from .pdf import run_pdf
 from .program import run_program
 from .stamp import run_stamp
 from .timeline import run_timeline
@@ -116,22 +117,14 @@ def build_pdf_tools_parser(subparsers):
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "-m", "--merge", help="Merge PDF files by listed name or directory"
-    )
-
-    parser.add_argument(
-        "-i",
-        "--input",
-        nargs="+",
-        type=Path,
-        help="Space-separated list of PDFs to PDF containing directories",
+        "-m", "--merge", nargs="+", type=Path, help="Merge PDF files by listed name or directory"
     )
 
     parser.add_argument(
         "-r",
         "--recursive",
-        action=argparse.BooleanOptionalAction,
-        default=False,
+        action="store_true",
+        help="Recursively walk any directory adding PDFs",
     )
 
     parser.add_argument(
@@ -140,7 +133,8 @@ def build_pdf_tools_parser(subparsers):
         type=Path,
         help="Merged file output (default name is merge.pdf)",
     )
-    parser.set_defaults(func=run_program)
+
+    parser.set_defaults(func=run_pdf)
 
 
 def main():
