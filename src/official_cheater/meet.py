@@ -100,15 +100,3 @@ class Meet:
 
     def __str__(self):
         return "Meet\n" + "\n".join(" " + str(session) for session in self.sessions)
-
-
-def main():
-    m: Meet = Meet()
-
-    m.parse_session_report(Path(r".\tests\timeline_001.pdf"))
-
-    print(m)
-
-
-if __name__ == "__main__":
-    main()

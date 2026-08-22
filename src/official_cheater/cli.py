@@ -3,6 +3,8 @@
 import argparse
 from pathlib import Path
 
+from official_cheater import debug
+
 from .program import run_program
 from .stamp import run_stamp
 from .timeline import run_timeline
@@ -34,7 +36,6 @@ def build_stamp_parser(subparsers):
         "--overlay_all",
         nargs="+",
         type=Path,
-        required=True,
         help="Space-separated list of overlay PDFs for all pages",
     )
 
@@ -144,7 +145,17 @@ def build_pdf_tools_parser(subparsers):
 
 def main():
     """Main function for processing command-line arguements."""
-    parser = argparse.ArgumentParser(description="Hy-Tek Helper")
+
+    # "hidden" debug option.  This must be called before the subarguemnt.  Example
+    # 'official-cheater --debug timeline'  It will not work if included anywhere else.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--debug",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+
+    parser = argparse.ArgumentParser(description="Hy-Tek Helper", parents=[common])
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # argument sub-groups
@@ -154,6 +165,8 @@ def main():
     build_pdf_tools_parser(subparsers)
 
     args = parser.parse_args()
+
+    debug.set(args.debug)
 
     # make sure we've set 'func' before attempting to call it
     if hasattr(args, "func"):

@@ -1,5 +1,6 @@
 """Handles the 'stamp' options for the official-cheater tools."""
 
+import argparse
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -10,7 +11,7 @@ from pypdf import PageObject, PdfReader, PdfWriter
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from . import report
+from official_cheater import report
 
 
 def _make_transparent_overlay(overlay_file: Path, dpi: int = 150) -> BytesIO:
@@ -115,12 +116,12 @@ def _get_overlay_transparencies(pages: list[Path]) -> list[PageObject]:
         A list of PDF PageObjects.
     """
     overlays: list[PageObject] = []
+    if pages is not None:
+        for page in pages:
+            overlay_buffer = _make_transparent_overlay(page)
+            overlay = PdfReader(overlay_buffer)
 
-    for page in pages:
-        overlay_buffer = _make_transparent_overlay(page)
-        overlay = PdfReader(overlay_buffer)
-
-        overlays.append(overlay.pages[0])
+            overlays.append(overlay.pages[0])
 
     return overlays
 
@@ -217,7 +218,8 @@ def process_arguements(args) -> None:
         missing_files.append(args.base_file)
 
     # overlay file(s) for every page
-    missing_files.extend(f for f in args.overlay_all if not f.exists())
+    if args.overlay_all is not None:
+        missing_files.extend(f for f in args.overlay_all if not f.exists())
 
     # overlay file(s) for the first or last page of an event grouping
     if args.overlay_event is not None:
@@ -239,24 +241,24 @@ def process_arguements(args) -> None:
         sys.exit(1)
 
 
-def run_stamp(args):
+def run_stamp(args: argparse.Namespace) -> None:
     """Runs the stamp tool based on command-line arguments.
 
     Args:
         args: Command-line arguments. See __cli__.py for the current list
             of arguments and their types.
     """
+    print(args) if args.debug else None
     process_arguements(args)
+
+    base: Path = args.base_file
 
     default_out: str = "_STAMPED"
 
     # if an output name isn't supplied create default
     # name = base.stem + default_out _ base.suffix(extension)
     if args.output is None:
-        # default name = base
-        b, e = (args.base_file.stem, args.base_file.suffix)
-
-        args.output = Path(f"{b}{default_out}{e}")
+        args.output = Path(f"{base.parent}\\{base.stem}{default_out}{base.suffix}")
 
     stamp_first: bool = args.event_stamp == "first"
 

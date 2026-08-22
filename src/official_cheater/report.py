@@ -6,8 +6,7 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
-_DEBUG: bool = False
-
+from . import debug
 
 # Regex for standard head on all reports
 # Example:
@@ -130,7 +129,7 @@ def cleanup_line(line: str) -> str:
     Return
         Cleaned up line
     """
-    if _DEBUG:
+    if debug.is_set():
         # handle possible ligatures with the FL in fly
         # this issues has only showed up in one session report
         if re.search(r"Butter ϐly", line):

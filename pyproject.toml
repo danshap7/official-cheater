@@ -7,6 +7,7 @@ name = "official-cheater"
 version = "0.1.0"
 description = "A Python utility for parsing, extracting, and processing data from Hy-Tek Meet Manager PDF files."
 readme = "README.md"
+authors = [{name = "Dan Shapiro", email = "danshap7@gmail.com"}]
 license = { file = "LICENSE" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
@@ -15,9 +16,15 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pymupdf>=1.28.2",
     "pypdf>=6.15.0",
-    "reportlab>=5.0.0"
+    "reportlab>=5.0.0",
+    "tzdata>=2026.3"
 ]
 requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/danshap7/official-cheater"
+Repository = "https://github.com/danshap7/official-cheater"
+
 
 [project.scripts]
 official-cheater = "official_cheater.cli:main"
@@ -35,7 +42,7 @@ line-length = 88
 line-length = 88
 
 [tool.pyright]
-typeCheckingMode = "basic"
+typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
