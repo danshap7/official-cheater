@@ -171,9 +171,3 @@ def main():
     # make sure we've set 'func' before attempting to call it
     if hasattr(args, "func"):
         args.func(args)
-    else:
-        parser.print_help()
-
-
-if __name__ == "__main__":
-    main()

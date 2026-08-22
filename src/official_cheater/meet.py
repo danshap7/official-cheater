@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from pypdf import PdfReader
 
-from . import report
+from . import debug, report
 from .event import Event
 from .session import Session
 
@@ -16,10 +16,10 @@ class Meet:
         self.debug: bool = False
         self.sessions: list[Session] = []
 
-    def parse_session_report(self, filename: Path, enableDebug=False):
+    def parse_session_report(self, filename: Path):
         reader = PdfReader(filename)
 
-        self.debug = enableDebug
+        self.debug = debug.is_set()
 
         # flag handles long sessions that span more than one page
         new_session_start: bool = True

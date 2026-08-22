@@ -26,7 +26,7 @@ def test_002(monkeypatch):
     main()
 
 
-def test_00(monkeypatch):
+def test_003(monkeypatch):
 
     debug.set(True)
     debug.log("Debug enabled as expected")

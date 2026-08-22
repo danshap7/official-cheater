@@ -176,19 +176,14 @@ def stamp_file(
             of each event. If False, apply them to the last page.
         output_file: Output file where the overlaid PDF is written.
     """
-    base = PdfReader(base_file)
-    writer = PdfWriter()
+    writer = PdfWriter(clone_from=base_file)
 
-    # Build the overlay pages once
-    all_overlays: list[PageObject] = _get_overlay_transparencies(overlay_all)
-    ev_overlays: list[PageObject] = _get_overlay_transparencies(overlay_event)
+    all_overlays = _get_overlay_transparencies(overlay_all)
+    ev_overlays = _get_overlay_transparencies(overlay_event)
 
-    # get mapping as to which event pages should be mapped
-    # event number places on the page that should be stamped
-    stamped_ev: list[int] = _get_event_stamp_page(base_file, first_page_event)
+    stamped_ev = _get_event_stamp_page(base_file, first_page_event)
 
-    # Apply ALL overlays to EACH base page
-    for i, page in enumerate(base.pages, start=0):
+    for i, page in enumerate(writer.pages):
         for overlay in all_overlays:
             page.merge_page(overlay)
 
@@ -196,9 +191,7 @@ def stamp_file(
             for overlay in ev_overlays:
                 page.merge_page(overlay)
 
-        writer.add_page(page)
-
-    with open(output_file, "wb") as f:
+    with output_file.open("wb") as f:
         writer.write(f)
 
 
