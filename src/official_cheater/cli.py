@@ -117,7 +117,11 @@ def build_pdf_tools_parser(subparsers):
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "-m", "--merge", nargs="+", type=Path, help="Merge PDF files by listed name or directory"
+        "-m",
+        "--merge",
+        nargs="+",
+        type=Path,
+        help="Merge PDF files by listed name or directory",
     )
 
     parser.add_argument(

@@ -37,14 +37,14 @@ def process_arguements(args) -> list[Path]:
         if path.is_file() and path.suffix.casefold() == _PDF_EX:
             pdfs.append(path)
 
-        elif path.is_dir():        
-            if args.recursive:            
+        elif path.is_dir():
+            if args.recursive:
                 pdfs.extend(
                     p
                     for p in path.rglob("*")
                     if p.is_file() and p.suffix.casefold() == _PDF_EX
                 )
-                
+
             else:
                 pdfs.extend(
                     p
@@ -69,5 +69,5 @@ def run_pdf(args) -> None:
         args.output = Path(f"{all_files[0].parent}\\files_MERGED.pdf")
 
     merge_pdfs(all_files, args.output)
-    
+
     print(f"MERGED: {args.output}")
