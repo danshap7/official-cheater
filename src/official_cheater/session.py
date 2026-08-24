@@ -1,6 +1,7 @@
 """TDB."""
 
-import datetime
+from dataclasses import field
+from datetime import datetime
 
 from .event import Event
 
@@ -20,8 +21,8 @@ class Session:
         # is the sum/merging of multiple sessions
         self.mergedSession: bool = False
 
-        self.datetimeFinish: datetime.datetime
-        self.datetimeStart: datetime.datetime
+        self.datetime_start: datetime = field(default_factory=datetime.now)
+        self.datetime_finish: datetime = field(default_factory=datetime.now)
 
         self.events = []
 

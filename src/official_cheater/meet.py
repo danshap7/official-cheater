@@ -13,13 +13,11 @@ from .session import Session
 
 class Meet:
     def __init__(self):
-        self.debug: bool = False
+        self.debug: bool = debug.is_set()
         self.sessions: list[Session] = []
 
     def parse_session_report(self, filename: Path):
         reader = PdfReader(filename)
-
-        self.debug = debug.is_set()
 
         # flag handles long sessions that span more than one page
         new_session_start: bool = True
@@ -80,14 +78,14 @@ class Meet:
 
                 # session start time
                 elif match := report.TIMELINE_START_T.search(line):
-                    self.sessions[-1].datetimeStart = datetime.strptime(
+                    self.sessions[-1].datetime_start = datetime.strptime(
                         f"{match.group(2)}:{match.group(3)} {match.group(4)}",
                         report.TIME_FORMAT,
                     ).replace(tzinfo=ZoneInfo("America/Phoenix"))
 
                 # session end time
                 elif match := report.TIMELINE_END_T.search(line):
-                    self.sessions[-1].datetimeFinish = datetime.strptime(
+                    self.sessions[-1].datetime_finish = datetime.strptime(
                         f"{match.group(1)}:{match.group(2)} {match.group(3)}",
                         report.TIME_FORMAT,
                     ).replace(tzinfo=ZoneInfo("America/Phoenix"))

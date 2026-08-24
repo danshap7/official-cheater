@@ -132,7 +132,7 @@ def cleanup_line(line: str) -> str:
     if debug.is_set():
         # handle possible ligatures with the FL in fly
         # this issues has only showed up in one session report
-        if re.search(r"Butter ϐly", line):
+        if re.search(r"ϐly", line):
             print("\tFixing Bufferfly ligature")
 
         # handle space between B*oys
@@ -143,7 +143,7 @@ def cleanup_line(line: str) -> str:
         if re.search(r"Gi rls", line):
             print("\tFixing space in gender - Girls")
 
-    line = re.sub(r"Butter ϐly", r"Butterfly", line)
+    line = re.sub(r"ϐly", r"fly", line)
     line = re.sub(r"B oys", r"Boys", line)
     line = re.sub(r"Gi rls", r"Girls", line)
 
