@@ -1,6 +1,12 @@
 
 @echo off
 
+echo python version
+python --version
+
+echo pip'd modules
+pip list
+
 echo -- clean-up -------------------------------------------
 python .\scripts\clean.py
 

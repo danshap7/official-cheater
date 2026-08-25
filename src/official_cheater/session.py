@@ -1,4 +1,4 @@
-"""TDB."""
+"""Class to hold session information"""
 
 from dataclasses import field
 from datetime import datetime
@@ -13,18 +13,21 @@ class Session:
         self.day: int = 0
         self.entries: int = 0
         self.heats: int = 0
-        self.dayOfMeet = 0
-
-        # has been combined into another session
-        self.hasBeenMerged: bool = False
-
-        # is the sum/merging of multiple sessions
-        self.mergedSession: bool = False
+        self.day_of_meet = 0
 
         self.datetime_start: datetime = field(default_factory=datetime.now)
         self.datetime_finish: datetime = field(default_factory=datetime.now)
 
         self.events = []
+
+        # Merging of sessions when you have pools seperated by gender.  This allows
+        # both pools' events and heats to be listed on one card.
+
+        # This session's information has been combined into another session
+        self.has_been_merged: bool = False
+
+        # This session is the sum/merging of two sessions
+        self.merged_session: bool = False
 
     def add_event(self, e: Event) -> None:
         self.events.append(e)

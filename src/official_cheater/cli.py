@@ -76,7 +76,16 @@ def build_timeline_parser(subparsers):
             are added.
     """
     parser = subparsers.add_parser("timeline", help="Analyze timeline")
+
     parser.add_argument("input_file", type=Path, help="Session report to be analyzed")
+
+    parser.add_argument(
+        "-m",
+        "--merge",
+        action="store_true",
+        help="Find mergeable sessions and merge them for cheatsheet",
+    )
+
     parser.add_argument(
         "-o",
         "--output",

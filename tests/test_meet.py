@@ -17,7 +17,7 @@ def test_000(monkeypatch, request):
     s: Session = Session("6", "final sessions")
     s.events.append(e)
 
-    m: Meet = Meet()
+    m: Meet = Meet(r".\tests\timeline_001.pdf")
     m.sessions.append(s)
 
     print(e)

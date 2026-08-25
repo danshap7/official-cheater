@@ -1,6 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import islice
-from pathlib import Path
 
 from . import report
 from .meet import Meet
@@ -17,10 +16,12 @@ class SheetLine:
     is_note: bool = False
 
 
-@dataclass
 class CheatSheet:
-    lines: list[SheetLine] = field(default_factory=list)
-    s: Session | None = None
+    def __init__(self, s: Session):
+        self.s: Session = s
+        self.lines: list[SheetLine] = []
+
+        self._load_session()
 
     @staticmethod
     def short_time(time: str) -> str:
@@ -85,39 +86,37 @@ class CheatSheet:
         s = SheetLine(event_name=note, is_note=True)
         self.lines.append(s)
 
-    def load_session(self, s: Session) -> None:
+    def _load_session(self) -> None:
 
-        self.s = s
-
-        event_iter = iter(range(len(s.events)))
+        event_iter = iter(range(len(self.s.events)))
 
         for i in event_iter:
             # this helps for odd number events in single gender session
-            compare_to = (i + 1) if (i + 1) != len(s.events) else i
+            compare_to = (i + 1) if (i + 1) != len(self.s.events) else i
 
             # is a mix event or a break?
-            if s.events[i].gender == "Mixed":
+            if self.s.events[i].gender == "Mixed":
                 # mixed event
                 self._add_line(
-                    s.events[i].number,
-                    s.events[i].heat_count,
-                    f"{s.events[i].distance} Mixed "
-                    f"{CheatSheet.short_event(s.events[i].stroke)}"
-                    f"{' R' if s.events[i].is_relay else ''}",
+                    self.s.events[i].number,
+                    self.s.events[i].heat_count,
+                    f"{self.s.events[i].distance} Mixed "
+                    f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                    f"{' R' if self.s.events[i].is_relay else ''}",
                     "",
                     "",
                 )
 
             # single gender session / pool
-            elif s.events[i].gender == s.events[compare_to].gender:
+            elif self.s.events[i].gender == self.s.events[compare_to].gender:
                 # left side (female)
-                if s.events[i].gender in ("Girls", "Women"):
+                if self.s.events[i].gender in ("Girls", "Women"):
                     self._add_line(
-                        s.events[i].number,
-                        s.events[i].heat_count,
-                        f"{s.events[i].distance} "
-                        f"{CheatSheet.short_event(s.events[i].stroke)}"
-                        f"{' R' if s.events[i].is_relay else ''}",
+                        self.s.events[i].number,
+                        self.s.events[i].heat_count,
+                        f"{self.s.events[i].distance} "
+                        f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                        f"{' R' if self.s.events[i].is_relay else ''}",
                         "",
                         "",
                     )
@@ -126,25 +125,25 @@ class CheatSheet:
                     self._add_line(
                         "",
                         "",
-                        f"{s.events[i].distance} "
-                        f"{CheatSheet.short_event(s.events[i].stroke)}"
-                        f"{' R' if s.events[i].is_relay else ''}",
-                        s.events[i].number,
-                        s.events[i].heat_count,
+                        f"{self.s.events[i].distance} "
+                        f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                        f"{' R' if self.s.events[i].is_relay else ''}",
+                        self.s.events[i].number,
+                        self.s.events[i].heat_count,
                     )
 
-            elif (s.events[i].stroke == s.events[i + 1].stroke) and (
-                s.events[i].distance == s.events[i + 1].distance
+            elif (self.s.events[i].stroke == self.s.events[i + 1].stroke) and (
+                self.s.events[i].distance == self.s.events[i + 1].distance
             ):
                 # pair up girls and boys events
                 self._add_line(
-                    s.events[i].number,
-                    s.events[i].heat_count,
-                    f"{s.events[i].distance} "
-                    f"{CheatSheet.short_event(s.events[i].stroke)}"
-                    f"{' R' if s.events[i].is_relay else ''}",
-                    s.events[i + 1].number,
-                    s.events[i + 1].heat_count,
+                    self.s.events[i].number,
+                    self.s.events[i].heat_count,
+                    f"{self.s.events[i].distance} "
+                    f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                    f"{' R' if self.s.events[i].is_relay else ''}",
+                    self.s.events[i + 1].number,
+                    self.s.events[i + 1].heat_count,
                 )
 
                 # skip the next index
@@ -156,11 +155,11 @@ class CheatSheet:
                 # assumes women before men in this listing
                 # TODO - don't assume
                 self._add_line(
-                    s.events[i].number,
-                    s.events[i].heat_count,
-                    f"{s.events[i].distance} "
-                    f"{CheatSheet.short_event(s.events[i].stroke)}"
-                    f"{' R' if s.events[i].is_relay else ''}",
+                    self.s.events[i].number,
+                    self.s.events[i].heat_count,
+                    f"{self.s.events[i].distance} "
+                    f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                    f"{' R' if self.s.events[i].is_relay else ''}",
                     "",
                     "",
                 )
@@ -168,23 +167,29 @@ class CheatSheet:
                 self._add_line(
                     "",
                     "",
-                    f"{s.events[i + 1].distance} "
-                    f"{CheatSheet.short_event(s.events[i + 1].stroke)}"
-                    f"{' R' if s.events[i + 1].is_relay else ''}",
-                    s.events[i + 1].number,
-                    s.events[i + 1].heat_count,
+                    f"{self.s.events[i + 1].distance} "
+                    f"{CheatSheet.short_event(self.s.events[i + 1].stroke)}"
+                    f"{' R' if self.s.events[i + 1].is_relay else ''}",
+                    self.s.events[i + 1].number,
+                    self.s.events[i + 1].heat_count,
                 )
 
                 # skip the next index
                 next(islice(event_iter, 1, 1), None)
 
             # does a break follow the current event?
-            if s.events[compare_to].break_follows:
-                self._add_a_note(f"Break: {s.events[compare_to].break_time}-minutes")
+            if self.s.events[compare_to].break_follows:
+                self._add_a_note(
+                    f"Break: {self.s.events[compare_to].break_time}-minutes"
+                )
 
         # finish up with the start and end times
-        t1: str = CheatSheet.short_time(s.datetime_start.strftime(report.TIME_FORMAT))
-        t2: str = CheatSheet.short_time(s.datetime_finish.strftime(report.TIME_FORMAT))
+        t1: str = CheatSheet.short_time(
+            self.s.datetime_start.strftime(report.TIME_FORMAT)
+        )
+        t2: str = CheatSheet.short_time(
+            self.s.datetime_finish.strftime(report.TIME_FORMAT)
+        )
         self._add_a_note(f"Start: {t1} Finish: {t2}")
 
     def dump(self):
@@ -204,13 +209,15 @@ if __name__ == "__main__":
     # Delete me sooon
     # this is for initial test
 
-    m: Meet = Meet()
-    m.parse_session_report(Path(r".\tests\timeline_002.pdf"))
+    m: Meet = Meet(r".\tests\timeline_001.pdf")
+
+    m.merge_sessions()
 
     c: list[CheatSheet] = []
 
-    for s in m.sessions:
-        c.append(CheatSheet())
+    print(m)
 
-        c[-1].load_session(s)
+    for s in m.sessions:
+        c.append(CheatSheet(s))
+
         c[-1].dump()
