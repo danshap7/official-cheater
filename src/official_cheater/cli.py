@@ -9,6 +9,7 @@ from .pdf import run_pdf
 from .program import run_program
 from .stamp import run_stamp
 from .timeline import run_timeline
+from .watch import run_watchers
 
 
 def build_stamp_parser(subparsers):
@@ -124,8 +125,7 @@ def build_pdf_tools_parser(subparsers):
     """
     parser = subparsers.add_parser("pdf", help="PDF file processsing")
 
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
+    parser.add_argument(
         "-m",
         "--merge",
         nargs="+",
@@ -150,6 +150,44 @@ def build_pdf_tools_parser(subparsers):
     parser.set_defaults(func=run_pdf)
 
 
+def build_watcher_parser(subparsers):
+    """Build command-line options for watching file processing.
+
+    Args:
+        subparsers: Argument parser subparsers to which the meet program options
+            are added.
+    """
+    parser = subparsers.add_parser(
+        "watch", help="Directory watchers for stamping files"
+    )
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--start",
+        dest="control",
+        type=Path,
+        help="Start a series on watchers based on supplied JSON file",
+    )
+
+    group.add_argument(
+        "--stop",
+        dest="control",
+        action="store_const",
+        const="stop",
+        help="Stop all watches",
+    )
+
+    group.add_argument(
+        "--status",
+        dest="control",
+        action="store_const",
+        const="status",
+        help="List all watchers",
+    )
+
+    parser.set_defaults(func=run_watchers)
+
+
 def main():
     """Main function for processing command-line arguements."""
 
@@ -170,6 +208,7 @@ def main():
     build_timeline_parser(subparsers)
     build_program_parser(subparsers)
     build_pdf_tools_parser(subparsers)
+    build_watcher_parser(subparsers)
 
     args = parser.parse_args()
 

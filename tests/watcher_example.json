@@ -1,0 +1,19 @@
+{
+  "watches": [
+    {
+      "directory": "C:\\MeetFiles",
+      "command": "C:\\Users\\Daniel\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\Scripts\\official-cheater.exe",
+      "arguments": ["--help"]
+    },
+    {
+      "directory": "C:\\MeetFiles",
+      "command": "official-cheater",
+      "arguments": ["stamp"]
+    },
+    {
+      "directory": "C:\\MeetFiles\\Results",
+      "command": "official-cheater",
+      "arguments": ["stamp", "--results"]
+    }
+  ]
+}
