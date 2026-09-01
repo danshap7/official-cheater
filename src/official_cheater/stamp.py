@@ -234,7 +234,7 @@ def process_arguements(args) -> None:
         sys.exit(1)
 
 
-def run_stamp(args: argparse.Namespace) -> None:
+def run_stamp(args) -> None:
     """Runs the stamp tool based on command-line arguments.
 
     Args:

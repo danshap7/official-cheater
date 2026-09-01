@@ -1,37 +1,44 @@
-import argparse
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 from . import debug
 
 
-def load_watcher_config(filename: Path) -> list[dict]:
-    with filename.open(encoding="utf-8") as f:
-        config = json.load(f)
-
-    return config["watches"]
-
-
 def launch_subprocesses(commands: list[dict]) -> None:
+    """Launches subprocess based on list passed in.
 
-    process = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "official_cheater.watcher_process",
-            r"C:\Users\Daniel\Desktop",
-            commands[0]["command"],
-            *commands[0]["arguments"],
-        ],
-        creationflags=(subprocess.CREATE_NEW_CONSOLE if debug.is_set() else 0),
-    )
+    Args:
+        commands: List of dictionaries that list the program arguements
+        to spawn as separate tasks
+    """
 
-    print(f"Started watcher PID {process.pid} {commands[0]['arguments']}")
+    try:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "official_cheater.watcher_process",
+                r"C:\Users\daniel\Desktop\test_dir",
+                commands[0]["command"],
+                *commands[0]["arguments"],
+            ],
+            creationflags=(subprocess.CREATE_NEW_CONSOLE if debug.is_set() else 0),
+        )
+
+        print(f"Started watcher PID {process.pid} {commands[0]['arguments']}")
+
+    except Exception as exc:
+        print(f"Failed to start subprocess: {type(exc).__name__}: {exc}")
 
 
-def run_watchers(args: argparse.Namespace) -> None:
+def run_watchers(args) -> None:
+    """Spawns subprocess to watch and stamp directories as files are added to them
+
+    Args:
+        args: Command-line arguments. See __cli__.py for the current list
+            of arguments and their types.
+    """
     print(args) if args.debug else None
 
     if args.control == "stop":
@@ -51,11 +58,18 @@ def run_watchers(args: argparse.Namespace) -> None:
             ],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         print(result.stdout)
 
     else:
-        out: list[dict] = load_watcher_config(args.control)
+        # open config file and spawn processess
+        try:
+            with args.control.open(encoding="utf-8") as f:
+                config = json.load(f)
 
-        launch_subprocesses(out)
+                launch_subprocesses(config["watches"])
+
+        except OSError as exc:
+            print(f"Unable to open {args.control}: {exc}")
