@@ -1,9 +1,9 @@
 {
   "watches": [
     {
-      "directory": "C:\\Users\\e21018161\\Desktop\\test_dir1",
-  "extension": ".pdf",
-  "exclusion_text": "_stamped",
+      "directory": "C:\\Users\\Daniel\\Desktop\\test_dir",
+      "extension": ".pdf",
+      "exclusion_text": "_stamped",
       "command": "official-cheater",
       "arguments": ["stamp", "-a", ".\\pdf\\upper_right__order_of_finish.pdf", "-e", ".\\pdf\\lower_right__closeout.pdf"]
     }

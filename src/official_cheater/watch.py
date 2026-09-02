@@ -11,7 +11,7 @@ def launch_subprocesses(watches: list[dict]) -> None:
     """Launches subprocess based on list passed in.
 
     Args:
-        commands: List of dictionaries that list the program arguements
+        commands: List of dictionaries that list the program arguments
         to spawn as separate tasks
     """
 
@@ -43,7 +43,7 @@ def launch_subprocesses(watches: list[dict]) -> None:
             print(f"Failed to start subprocess: {type(e).__name__}: {e}")
 
 
-def run_status(status):
+def run_status():
     """runs the 'watch --status' commandline option
     Displays all running process of official_cheater.watcher_process
     """
@@ -71,8 +71,11 @@ def is_killed_pid(kill_list: list, current_pid) -> bool:
 
 
 def run_stop(stop: list) -> None:
-    """runs the 'watch --stop' commandline option
-    Currently kills all processes"""
+    """runs the 'watch --stop' commandline option.  Kills watcher processes.
+
+    Args:
+        stop: A list containing 'all' or one or more PIDs to kill
+    """
 
     for process in psutil.process_iter(["pid", "name", "cmdline"]):
         try:
@@ -100,13 +103,14 @@ def run_watchers(args) -> None:
         args: Command-line arguments. See __cli__.py for the current list
             of arguments and their types.
     """
+
     print(args) if args.debug else None
 
     if args.stop:
         run_stop(args.stop)
 
     elif args.status:
-        run_status(args.status)
+        run_status()
 
     else:
         # open config file and spawn processess
