@@ -2,10 +2,12 @@ import json
 import subprocess
 import sys
 
+import psutil
+
 from . import debug
 
 
-def launch_subprocesses(commands: list[dict]) -> None:
+def launch_subprocesses(watches: list[dict]) -> None:
     """Launches subprocess based on list passed in.
 
     Args:
@@ -13,23 +15,82 @@ def launch_subprocesses(commands: list[dict]) -> None:
         to spawn as separate tasks
     """
 
-    try:
-        process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "official_cheater.watcher_process",
-                r"C:\Users\daniel\Desktop\test_dir",
-                commands[0]["command"],
-                *commands[0]["arguments"],
-            ],
-            creationflags=(subprocess.CREATE_NEW_CONSOLE if debug.is_set() else 0),
-        )
+    for watch in watches:
+        try:
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-m",
+                    "official_cheater.watcher_process",
+                    watch["directory"],
+                    watch["extension"],
+                    watch["exclusion_text"],
+                    watch["command"],
+                    *watch["arguments"],
+                ],
+                creationflags=(
+                    subprocess.CREATE_NEW_CONSOLE
+                    if debug.is_set()
+                    else subprocess.CREATE_NO_WINDOW
+                ),
+            )
 
-        print(f"Started watcher PID {process.pid} {commands[0]['arguments']}")
+            print(
+                f"Started watcher PID {process.pid} on {watch['directory']} with {watch['command']} {watch['arguments']}"
+            )
 
-    except Exception as exc:
-        print(f"Failed to start subprocess: {type(exc).__name__}: {exc}")
+        except OSError as e:
+            print(f"Failed to start subprocess: {type(e).__name__}: {e}")
+
+
+def run_status(status):
+    """runs the 'watch --status' commandline option
+    Displays all running process of official_cheater.watcher_process
+    """
+
+    for process in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            # in the off chance that commadline is None
+            cmdline = process.info["cmdline"] or []
+
+            if "official_cheater.watcher_process" in cmdline:
+                print(f"PID {process.info['pid']}: {' '.join(cmdline)}")
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            # TODO needs better error handling
+            # should other exceptions be handled?
+            pass
+
+
+def is_killed_pid(kill_list: list, current_pid) -> bool:
+    """return true if list contains 'all' anywhere or the
+    current_pid is in the list
+    """
+
+    return "all" in kill_list or current_pid in kill_list
+
+
+def run_stop(stop: list) -> None:
+    """runs the 'watch --stop' commandline option
+    Currently kills all processes"""
+
+    for process in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            # in the off chance that commadline is None
+            cmdline = process.info["cmdline"] or []
+
+            if "official_cheater.watcher_process" in cmdline and is_killed_pid(
+                stop, process.info["pid"]
+            ):
+                process.kill()
+                process.wait(timeout=3)  # Wait for process to terminate
+
+                print(f"Killed PID {process.info['pid']}: {' '.join(cmdline)}")
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            # TODO needs better error handling
+            # should other exceptions be handled?
+            pass
 
 
 def run_watchers(args) -> None:
@@ -41,35 +102,22 @@ def run_watchers(args) -> None:
     """
     print(args) if args.debug else None
 
-    if args.control == "stop":
-        print("stop")
+    if args.stop:
+        run_stop(args.stop)
 
-    elif args.control == "status":
-        result = subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-Command",
-                (
-                    "Get-CimInstance Win32_Process | "
-                    "Where-Object {$_.CommandLine -like '*official_cheater.watch*'} | "
-                    "Select-Object -ExpandProperty ProcessId"
-                ),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-        print(result.stdout)
+    elif args.status:
+        run_status(args.status)
 
     else:
         # open config file and spawn processess
         try:
-            with args.control.open(encoding="utf-8") as f:
+            with args.start.open(encoding="utf-8") as f:
                 config = json.load(f)
 
                 launch_subprocesses(config["watches"])
 
         except OSError as exc:
             print(f"Unable to open {args.control}: {exc}")
+
+        except json.JSONDecodeError as e:
+            print(f"Invalid JSON: {e}")

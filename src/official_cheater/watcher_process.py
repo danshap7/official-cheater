@@ -1,5 +1,5 @@
-import sys
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -25,48 +25,49 @@ def wait_for_file(file: Path, stable_time: float = 2.0) -> bool:
         time.sleep(0.5)
 
 
-def watch_directory(directory: str) -> None:
-    path = Path(directory)
-    existing = set(path.iterdir())
+def watch_directory(
+    directory: str, ext: str, exclude: str, command: str, arguments: list[str]
+) -> None:
+    """call passed command with arguments when 'directory' is written to"""
 
-    print(f"Watcher starting: {directory}", flush=True)
-    print(f"Path exists: {path.exists()}", flush=True)
+    watch_path: Path = Path(directory)
+    existing_files = set(watch_path.iterdir())
+
+    print(f"Watcher starting: {directory}")
+    print(f"Path exists: {watch_path.exists()}")
+    print(f"Arguments: {arguments}")
 
     while True:
-        current = set(path.iterdir())
-        added = current - existing
+        current_files = set(watch_path.iterdir())
+        added_files = current_files - existing_files
 
-        for file in added:
-
+        for file in added_files:
             # only trigger on PDFs that have stopped updating
             # and do not contain '_stamped' in the filename
             # i.e. not files we stamped
             if (
                 file.is_file()
-                and file.suffix.casefold() == ".pdf"
-                and "_stamped" not in file.name.casefold()
+                and file.suffix.casefold() == ext
+                and exclude not in file.name.casefold()
                 and wait_for_file(file)
             ):
-                print("new")
+                proc_cmd = [
+                    command,
+                    arguments[0],
+                    str(file),
+                ] + arguments[1:]
 
-                command = [ "official-cheater",
-                            "stamp",
-                            str(file),
-                            "-a",
-                            r".\pdf\upper_right__order_of_finish.pdf",
-                            "-e",
-                            r".\pdf\lower_right__closeout.pdf",
-                        ]
+                print(f"NEW: {file} CMD: {command} {', '.join(arguments)}")
 
                 try:
                     subprocess.run(
-                        command,
+                        proc_cmd,
                         check=True,
-                    )    
-                except Exception as exc:
-                    print(f"Failed to start subprocess: {type(exc).__name__}: {exc}")
+                    )
+                except OSError as e:
+                    print(f"Failed to start subprocess: {type(e).__name__}: {e}")
 
-        existing = current
+        existing_files = current_files
         time.sleep(2)
 
 
@@ -74,4 +75,10 @@ if __name__ == "__main__":
     for i in range(len(sys.argv)):
         print(sys.argv[i])
 
-    watch_directory(sys.argv[1])
+    watch_directory(
+        directory=sys.argv[1],
+        ext=sys.argv[2],
+        exclude=sys.argv[3],
+        command=sys.argv[4],
+        arguments=sys.argv[5:],
+    )

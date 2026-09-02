@@ -1,6 +1,5 @@
 """Handles the 'stamp' options for the official-cheater tools."""
 
-import argparse
 import sys
 from io import BytesIO
 from pathlib import Path

@@ -150,6 +150,19 @@ def build_pdf_tools_parser(subparsers):
     parser.set_defaults(func=run_pdf)
 
 
+def pid_or_all(value: str) -> int | str:
+    """Enforce that we either have an 'all' or an int as a type"""
+    if value.casefold() == "all":
+        return "all"
+
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "must be a integer PID number or 'all'"
+        ) from exc
+
+
 def build_watcher_parser(subparsers):
     """Build command-line options for watching file processing.
 
@@ -161,25 +174,22 @@ def build_watcher_parser(subparsers):
         "watch", help="Directory watchers for stamping files"
     )
 
+    # non-selected options will be set to None from this mux group
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "--start",
-        dest="control",
         type=Path,
         help="Start a series on watchers based on supplied JSON file",
     )
 
     group.add_argument(
         "--stop",
-        dest="control",
-        action="store_const",
-        const="stop",
-        help="Stop all watches",
+        nargs="+",
+        type=pid_or_all,
+        help="Stop all watchers, or selectively by PID ",
     )
-
     group.add_argument(
         "--status",
-        dest="control",
         action="store_const",
         const="status",
         help="List all watchers",

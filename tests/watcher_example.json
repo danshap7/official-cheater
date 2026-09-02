@@ -1,19 +1,11 @@
 {
   "watches": [
     {
-      "directory": "C:\\MeetFiles",
-      "command": "C:\\Users\\Daniel\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python313\\Scripts\\official-cheater.exe",
-      "arguments": ["--help"]
-    },
-    {
-      "directory": "C:\\MeetFiles",
+      "directory": "C:\\Users\\e21018161\\Desktop\\test_dir1",
+  "extension": ".pdf",
+  "exclusion_text": "_stamped",
       "command": "official-cheater",
-      "arguments": ["stamp"]
-    },
-    {
-      "directory": "C:\\MeetFiles\\Results",
-      "command": "official-cheater",
-      "arguments": ["stamp", "--results"]
+      "arguments": ["stamp", "-a", ".\\pdf\\upper_right__order_of_finish.pdf", "-e", ".\\pdf\\lower_right__closeout.pdf"]
     }
   ]
 }
