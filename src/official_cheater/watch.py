@@ -1,3 +1,5 @@
+"""Handles the 'watch' options for the official-cheater tools."""
+
 import json
 import subprocess
 import sys
@@ -43,7 +45,7 @@ def launch_subprocesses(watches: list[dict]) -> None:
             print(f"Failed to start subprocess: {type(e).__name__}: {e}")
 
 
-def run_status():
+def run_status() -> None:
     """runs the 'watch --status' commandline option
     Displays all running process of official_cheater.watcher_process
     """

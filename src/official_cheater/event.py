@@ -17,7 +17,7 @@ class Event:
     total_entries: int = 0
     heat_count: int = 0
     is_relay: bool = False
-    datetime_start: datetime = field(default_factory=datetime.now)
+    datetime_start: datetime = field(default_factory=lambda: datetime.now())
 
     # if a break follows this event on the session report
     break_follows: bool = False

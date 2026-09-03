@@ -15,8 +15,8 @@ class Session:
         self.heats: int = 0
         self.day_of_meet = 0
 
-        self.datetime_start: datetime = field(default_factory=datetime.now)
-        self.datetime_finish: datetime = field(default_factory=datetime.now)
+        self.datetime_start: datetime = field(default_factory=lambda: datetime.now())
+        self.datetime_start: datetime = field(default_factory=lambda: datetime.now())
 
         self.events = []
 

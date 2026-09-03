@@ -5,7 +5,6 @@ from datetime import datetime
 from itertools import islice
 from pathlib import Path
 from typing import Final
-from zoneinfo import ZoneInfo
 
 from pypdf import PdfReader
 
@@ -90,14 +89,14 @@ class Meet:
                     self.sessions[-1].datetime_start = datetime.strptime(
                         f"{match.group(2)}:{match.group(3)} {match.group(4)}",
                         report.TIME_FORMAT,
-                    ).replace(tzinfo=ZoneInfo("America/Phoenix"))
+                    )
 
                 # session end time
                 elif match := report.TIMELINE_END_T.search(line):
                     self.sessions[-1].datetime_finish = datetime.strptime(
                         f"{match.group(1)}:{match.group(2)} {match.group(3)}",
                         report.TIME_FORMAT,
-                    ).replace(tzinfo=ZoneInfo("America/Phoenix"))
+                    )
 
                     # "Finish Time" is always at the end of a session.  The
                     #  next line read will be the beginning of a new session.

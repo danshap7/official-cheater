@@ -1,3 +1,5 @@
+"""Separate task to be spawned for watching for added files to a directory"""
+
 import subprocess
 import sys
 import time
