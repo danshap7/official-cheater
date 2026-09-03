@@ -8,19 +8,22 @@ version = "0.0.1"
 description = "A Python utility for parsing, extracting, and processing data from Hy-Tek Meet Manager PDFs."
 readme = "README.md"
 authors = [{name = "Dan Shapiro", email = "danshap7@gmail.com"}]
-license = { file = "LICENSE" }
-classifiers = [
-    "License :: OSI Approved :: MIT License",
-]
+license = "MIT"
+license-files = ["LICENSE"]
+
 dependencies = [
     "openpyxl>=3.1.5",
     "pymupdf>=1.28.2",
     "pypdf>=6.15.0",
     "reportlab>=5.0.0",
     "tzdata>=2026.3",
-"openpyxl>=3.1.5",
-"psutil>=7.0.0"
+    "openpyxl>=3.1.5",
+    "psutil>=7.0.0"
 ]
+
+requires-python = ">=3.12"
+
+
 [project.optional-dependencies]
 test = [
     "pytest",
@@ -35,7 +38,6 @@ dev = [
     "build",
 ]
 
-requires-python = ">=3.10"
 
 [project.urls]
 Homepage = "https://github.com/danshap7/official-cheater"
@@ -53,6 +55,9 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 88
+
+[tool.ruff.lint]
+ignore = ["DTZ005", "DTZ007"]
 
 [tool.black]
 line-length = 88

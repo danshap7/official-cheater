@@ -56,7 +56,7 @@ class Meet:
                 elif match := report.TIMELINE_EVENT.search(line):
                     print("NEW EVENT") if self.debug else None  # DEBUG
 
-                    start_time: datetime = datetime.strptime(  # noqa: DTZ007
+                    start_time: datetime = datetime.strptime(
                         f"{match.group(10)}", report.TIME_FORMAT
                     )
 

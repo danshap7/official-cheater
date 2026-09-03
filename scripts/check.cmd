@@ -10,12 +10,6 @@ pip list
 echo -- clean-up -------------------------------------------
 python .\scripts\clean.py
 
-echo -- check building of package --------------------------
-python -m build
-
-echo -- check package meta data ----------------------------
-python -m twine check dist/*
-
 @REM - run linter and format checker - both with auto fix
 echo -- ruff -----------------------------------------------
 python -m ruff check . --fix

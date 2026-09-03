@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.styles.borders import Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 from .cheat_sheet import CheatSheet
 from .meet import Meet
@@ -182,7 +183,7 @@ class ExcelWorkbook:
 
                 # add border around the whole thing
 
-    def make_event_durations(self, sessions: list[Sessions]):
+    def make_event_durations(self, sessions: list[Session]):
 
         unmerged_sessions = (s for s in sessions if not s.merged_session)
 
@@ -227,14 +228,126 @@ class ExcelWorkbook:
             # add a single row space before each column
             row += 1
 
+    def _get_hours_mins(
+        self, start_time: datetime, end_time: datetime
+    ) -> tuple[int, int]:
+
+        time_delta: timedelta = end_time - start_time
+        delta_seconds: int = int(time_delta.total_seconds())
+        minutes: int = delta_seconds // 60
+        hours: int = minutes // 60
+
+        # works whether hours >= 0
+        remainder_minutes: int = minutes - (hours * 60)
+
+        return (hours, remainder_minutes)
+
+
+"""
+   def make_session_diagnostics(self, sessions: list[Session]):
+
+        unmerged_sessions = (s for s in sessions if not s.merged_session)
+
+        ws = self._create_unique_sheet("Diagnostics")
+
+        fontStyleHeader = Font(bold=True)
+
+        redFill = PatternFill(
+            start_color="FF0000", end_color="FF0000", fill_type="solid"
+        )
+
+        header_names: list[str] = [
+            "Session",
+            "Lanes",
+            "Heats",
+            "Splashes",
+            "Interval",
+            "+ Back",
+            "Time",
+            "12U Finish",
+            "12U End Event",
+        ]
+        header_widths: list[int] = [10, 10, 10, 10, 10, 10, 10, 10, 20]
+
+        # the two arrays above should stay the same length
+        assert len(header_names) == len(header_names)
+
+        # header
+        for j in range(len(headerName)):
+            ws.cell(1, j + 1, value=headerName[j])
+            ws.column_dimensions[get_column_letter(j + 1)].width = headerWidth[j]
+            ws.cell(1, j + 1).font = fontStyleHeader
+            ws.cell(1, j + 1).alignment = Alignment(vertical="center")
+
+        # write all session data
+        for row, s in enumerate(unmerged_sessions, start=2):
+            heats = 0
+            splashes = 0
+
+            # count all session heats and entries (aka 'splashes')
+            for e in s.event:
+                heats += e.heatCount
+                splashes += e.totalEntries
+
+            (hours, minutes) = self._get_hours_mins(s.datetimeStart, s.datetimeFinish)
+
+            ws.cell(row, 1, value=f"{s.number}")
+            ws.cell(row, 2, value=f"{s.poolSize}")
+            ws.cell(row, 3, value=f"{heats}")
+            ws.cell(row, 4, value=f"{splashes}")
+            ws.cell(row, 5, value=f"{s.interval}")
+            ws.cell(row, 6, value=f"{s.plusBackInterval}")
+
+            ws.cell(row, 7, value=f"{hours}h {minutes}m")
+
+            if s.last12Uevent is not None:
+                final12U: int = s.event.index(s.last12Uevent)
+                endTime12U: datetime
+
+                # is it the final event in the session
+                # if so, the final 12U is the session end time
+                # len()-1 == last index
+                if final12U == len(s.event) - 1:
+                    endTime12U = s.datetimeFinish
+                else:
+                    # else, the final time is the start time of the
+                    # event following the final 12U event
+                    final12U += 1
+                    endTime12U = s.event[final12U].datetimeStart
+
+                (hours, minutes) = getHoursMins(s.datetimeStart, endTime12U)
+
+                ws.cell(row, 8, value=f"{hours}h {minutes}m")
+                ws.cell(
+                    row,
+                    9,
+                    value=f"E{s.event[final12U].number} "
+                    f"{s.event[final12U].distance} "
+                    f"{shortEvent(s.event[final12U].name)}",
+                )
+
+                # if the 12U finish time is greater than 4-hours
+                if hours >= 4:
+                    cellToColor = ws.cell(row, 8)
+                    cellToColor.fill = redFill
+
+                    # count 12U heats
+                    heats12U: int = 0
+                    for i in range(final12U + 1):
+                        heats12U += s.event[i].heatCount
+
+                    savedMin: int = (heats12U * 5) // 60
+                    line: str = f"12U Heats {heats12U}, 5-sec saves {savedMin}-min"
+                    ws.cell(row, 10, value=line)
+"""
 
 if __name__ == "__main__":
-    m: Meet = Meet(r"C:\Users\e21018161\official-cheater2\tests\timeline_001.pdf")
+    m: Meet = Meet(r".\tests\timeline_001.pdf")
 
     wb: ExcelWorkbook = ExcelWorkbook()
 
-    # wb.make_cheat_sheets(m.sessions)
-    # wb.make_cheat_sheets(m.sessions, True)
+    wb.make_cheat_sheets(m.sessions)
+    wb.make_cheat_sheets(m.sessions, True)
     wb.make_event_durations(m.sessions)
 
     wb.write("out.xlsx")
