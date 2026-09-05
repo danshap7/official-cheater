@@ -73,4 +73,20 @@ def test_005(monkeypatch):
         ],
     )
 
+
+def test_006(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "official-cheater",
+            "timeline",
+            r".\tests\timeline_001.pdf",
+            "--merge",
+            "--3column",
+            "--output",
+            r".\tests\timeline_001.out.xlsx",
+        ],
+    )
+
     main()

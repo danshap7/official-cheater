@@ -1,9 +1,10 @@
 """Handles the 'stamp' options for the official-cheater tools."""
 
+import os
 import sys
 from io import BytesIO
 from pathlib import Path
-import os
+
 import pymupdf
 from PIL import Image, ImageChops
 from pypdf import PageObject, PdfReader, PdfWriter
@@ -259,4 +260,4 @@ def run_stamp(args) -> None:
     )
 
     if args.print:
-        os.startfile(str(args.output), "print") 
+        os.startfile(str(args.output), "print")

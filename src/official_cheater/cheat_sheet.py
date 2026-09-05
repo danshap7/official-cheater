@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from itertools import islice
 
 from . import report
-from .meet import Meet
 from .session import Session
 from .utilities import short_event, short_time
 
@@ -159,21 +158,3 @@ class CheatSheet:
             {i.event_name}\
             {i.mens_event_num}\\{i.mens_heat_count}"
             )
-
-
-if __name__ == "__main__":
-    # Delete me sooon
-    # this is for initial testing
-
-    m: Meet = Meet(r".\tests\timeline_001.pdf")
-
-    m.merge_sessions()
-
-    c: list[CheatSheet] = []
-
-    print(m)
-
-    for s in m.sessions:
-        c.append(CheatSheet(s))
-
-        c[-1].dump()
