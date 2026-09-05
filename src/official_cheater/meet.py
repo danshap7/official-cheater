@@ -84,13 +84,6 @@ class Meet:
                     self.sessions[-1].entries = int(match.group(1))
                     self.sessions[-1].heats = int(match.group(2))
 
-                # session start time
-                elif match := report.TIMELINE_START_T.search(line):
-                    self.sessions[-1].datetime_start = datetime.strptime(
-                        f"{match.group(2)}:{match.group(3)} {match.group(4)}",
-                        report.TIME_FORMAT,
-                    )
-
                 # session end time
                 elif match := report.TIMELINE_END_T.search(line):
                     self.sessions[-1].datetime_finish = datetime.strptime(
@@ -103,6 +96,17 @@ class Meet:
                     #  This helps handle cases where the session timeline spans
                     # multiple pages
                     new_session_start = True
+
+                # session start time and intervals
+                elif match := report.TIMELINE_HEADER.search(line):
+                    self.sessions[-1].interval = int(match.group(5))
+                    self.sessions[-1].plus_back_interval = int(match.group(6))
+                    self.sessions[-1].day_of_meet = int(match.group(1))
+
+                    self.sessions[-1].datetime_start = datetime.strptime(
+                        f"{match.group(2)}:{match.group(3)} {match.group(4)}",
+                        report.TIME_FORMAT,
+                    )
 
     def merge_sessions(self):
         """Find mergeable sessions and adds a merged version"""

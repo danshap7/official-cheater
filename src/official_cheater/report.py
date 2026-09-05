@@ -81,8 +81,20 @@ TIMELINE_START_T = re.compile(
 # group 2: Minute
 # group 3: Second
 # group 4: AM/PM
-TIMELINE_END_T = re.compile(r"Finish Time\D+(\d{2})\:(\d{2})\s(AM|PM)")
+# group 5: Interval
+# group 6: Backstroke interval
+TIMELINE_HEADER = re.compile(
+    r"Day of Meet: (\d+)\s+Starts at "
+    r"(\d{2})\:(\d{2})\s?((?:AM|PM))"
+    r"\s+Heat Interval\: (\d+) Seconds"
+    r" / Back \+(\d+) Seconds"
+)
 
+# group 1: Hour
+# group 2: Minute
+# group 3: Second
+# group 4: AM/PM
+TIMELINE_END_T = re.compile(r"Finish Time\D+(\d{2})\:(\d{2})\s(AM|PM)")
 
 # Time format used on reports
 TIME_FORMAT = r"%I:%M %p"

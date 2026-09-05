@@ -4,6 +4,7 @@ from itertools import islice
 from . import report
 from .meet import Meet
 from .session import Session
+from .utilities import short_event, short_time
 
 
 @dataclass
@@ -22,47 +23,6 @@ class CheatSheet:
         self.lines: list[SheetLine] = []
 
         self._load_session()
-
-    @staticmethod
-    def short_time(time: str) -> str:
-
-        # remove leading zeros
-        time = time.lstrip("0")
-
-        # swap A for AM and P for PM
-        time = time.replace(" AM", "A")
-        time = time.replace(" PM", "P")
-
-        return time
-
-    @staticmethod
-    def short_event(eventname: str) -> str | None:
-
-        lookup: dict[str, str] = {
-            "Butterfly": "Fly",
-            "Backstroke": "BK",
-            "Breaststroke": "BR",
-            "Freestyle": "FR",
-            "Medley": "Med",
-            "IM": "IM",
-        }
-
-        # returns None if eventname is not found
-        return lookup.get(eventname)
-
-    @staticmethod
-    def short_gender(gender: str) -> str | None:
-
-        lookup: dict[str, str] = {
-            "Girls": "W",
-            "Women": "W",
-            "Boys": "M",
-            "Men": "M",
-            "Mixed": "X",
-        }
-
-        # returns None if gender is not found
-        return lookup.get(gender)
 
     def _add_line(
         self,
@@ -101,7 +61,7 @@ class CheatSheet:
                     self.s.events[i].number,
                     self.s.events[i].heat_count,
                     f"{self.s.events[i].distance} Mixed "
-                    f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                    f"{short_event(self.s.events[i].stroke)}"
                     f"{' R' if self.s.events[i].is_relay else ''}",
                     "",
                     "",
@@ -115,7 +75,7 @@ class CheatSheet:
                         self.s.events[i].number,
                         self.s.events[i].heat_count,
                         f"{self.s.events[i].distance} "
-                        f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                        f"{short_event(self.s.events[i].stroke)}"
                         f"{' R' if self.s.events[i].is_relay else ''}",
                         "",
                         "",
@@ -126,7 +86,7 @@ class CheatSheet:
                         "",
                         "",
                         f"{self.s.events[i].distance} "
-                        f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                        f"{short_event(self.s.events[i].stroke)}"
                         f"{' R' if self.s.events[i].is_relay else ''}",
                         self.s.events[i].number,
                         self.s.events[i].heat_count,
@@ -140,7 +100,7 @@ class CheatSheet:
                     self.s.events[i].number,
                     self.s.events[i].heat_count,
                     f"{self.s.events[i].distance} "
-                    f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                    f"{short_event(self.s.events[i].stroke)}"
                     f"{' R' if self.s.events[i].is_relay else ''}",
                     self.s.events[i + 1].number,
                     self.s.events[i + 1].heat_count,
@@ -158,7 +118,7 @@ class CheatSheet:
                     self.s.events[i].number,
                     self.s.events[i].heat_count,
                     f"{self.s.events[i].distance} "
-                    f"{CheatSheet.short_event(self.s.events[i].stroke)}"
+                    f"{short_event(self.s.events[i].stroke)}"
                     f"{' R' if self.s.events[i].is_relay else ''}",
                     "",
                     "",
@@ -168,7 +128,7 @@ class CheatSheet:
                     "",
                     "",
                     f"{self.s.events[i + 1].distance} "
-                    f"{CheatSheet.short_event(self.s.events[i + 1].stroke)}"
+                    f"{short_event(self.s.events[i + 1].stroke)}"
                     f"{' R' if self.s.events[i + 1].is_relay else ''}",
                     self.s.events[i + 1].number,
                     self.s.events[i + 1].heat_count,
@@ -184,12 +144,8 @@ class CheatSheet:
                 )
 
         # finish up with the start and end times
-        t1: str = CheatSheet.short_time(
-            self.s.datetime_start.strftime(report.TIME_FORMAT)
-        )
-        t2: str = CheatSheet.short_time(
-            self.s.datetime_finish.strftime(report.TIME_FORMAT)
-        )
+        t1: str = short_time(self.s.datetime_start.strftime(report.TIME_FORMAT))
+        t2: str = short_time(self.s.datetime_finish.strftime(report.TIME_FORMAT))
         self._add_a_note(f"Start: {t1} Finish: {t2}")
 
     def dump(self):
@@ -207,7 +163,7 @@ class CheatSheet:
 
 if __name__ == "__main__":
     # Delete me sooon
-    # this is for initial test
+    # this is for initial testing
 
     m: Meet = Meet(r".\tests\timeline_001.pdf")
 

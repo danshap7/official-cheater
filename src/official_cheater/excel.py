@@ -1,14 +1,17 @@
+from copy import copy
 from datetime import datetime, timedelta
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font
+from openpyxl.cell.cell import MergedCell
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.styles.borders import Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
-from .cheat_sheet import CheatSheet
+from .cheat_sheet import CheatSheet, SheetLine
 from .meet import Meet
 from .session import Session
+from .utilities import get_delta_time_HM, short_event, short_gender
 
 # excel worksheet board style
 _THIN_BORDER = Border(
@@ -23,6 +26,7 @@ _FONT_STYLE = Font(size="14")
 _FONT_STYLE_BOLD = Font(size="14", bold=True)
 
 # excel worksheet column widths
+_BUFFER_COLUMN_WIDTH: int = 6
 _EVENT_COLUMN_WIDTH: int = 6
 _NAME_COLUMN_WIDTH: int = 16
 
@@ -76,6 +80,72 @@ class ExcelWorkbook:
 
         return self.wb.create_sheet(sheet_name)
 
+    def _cheat_sheet_setup(self, s: Session, three_column: bool = False) -> Worksheet:
+        """Creates worksheet, sets up the column widths and adds headers"""
+        ws: Worksheet = self._create_unique_sheet(f"S{s.number}")
+
+        if three_column:
+            ws.column_dimensions[get_column_letter(1)].width = _EVENT_COLUMN_WIDTH * 2
+            ws.column_dimensions[get_column_letter(2)].width = _NAME_COLUMN_WIDTH
+            ws.column_dimensions[get_column_letter(3)].width = _EVENT_COLUMN_WIDTH * 2
+            ws.column_dimensions[get_column_letter(4)].width = _BUFFER_COLUMN_WIDTH
+        else:
+            ws.column_dimensions[get_column_letter(1)].width = _EVENT_COLUMN_WIDTH
+            ws.column_dimensions[get_column_letter(2)].width = _EVENT_COLUMN_WIDTH
+            ws.column_dimensions[get_column_letter(3)].width = _NAME_COLUMN_WIDTH
+            ws.column_dimensions[get_column_letter(4)].width = _EVENT_COLUMN_WIDTH
+            ws.column_dimensions[get_column_letter(5)].width = _EVENT_COLUMN_WIDTH
+            ws.column_dimensions[get_column_letter(6)].width = _BUFFER_COLUMN_WIDTH
+
+        # header
+        if three_column:
+            ws.cell(row=1, column=1, value="W/M")
+            ws.cell(row=1, column=2, value=f"Session {s.number}")
+            ws.cell(row=1, column=3, value="W/M")
+        else:
+            ws.cell(row=1, column=1, value="W")
+            ws.cell(row=1, column=2, value="H")
+            ws.cell(row=1, column=3, value=f"Session {s.number}")
+            ws.cell(row=1, column=4, value="M")
+            ws.cell(row=1, column=5, value="H")
+
+        return ws
+
+    def _write_cheat_sheet_line(
+        self, ws: Worksheet, three_column: int, index: int, line: SheetLine
+    ) -> None:
+        """Writes a single event (women and men) to a cheat sheet
+
+        Args:
+            ws: Worksheet reference
+            three_column: Boolean flag whether this is a three or five
+                          column cheat sheet
+            index: Row intex to write to
+            line: line containing event/heat/strok/distance
+        """
+
+        if three_column:
+            ws.cell(
+                row=index,
+                column=1,
+                value=self._get_line(str(line.womems_ev_num), str(line.mens_event_num)),
+            )
+            ws.cell(row=index, column=2, value=line.event_name)
+            ws.cell(
+                row=index,
+                column=3,
+                value=self._get_line(
+                    str(line.womens_heat_count), str(line.mens_heat_count)
+                ),
+            )
+
+        else:
+            ws.cell(row=index, column=1, value=line.womems_ev_num)
+            ws.cell(row=index, column=2, value=line.womens_heat_count)
+            ws.cell(row=index, column=3, value=line.event_name)
+            ws.cell(row=index, column=4, value=line.mens_event_num)
+            ws.cell(row=index, column=5, value=line.mens_heat_count)
+
     def make_cheat_sheets(
         self, sessions: list[Session], three_column: bool = False
     ) -> None:
@@ -95,33 +165,7 @@ class ExcelWorkbook:
         for s in filtered_sessions:
             row_count = 1
 
-            ws = self._create_unique_sheet(f"S{s.number}")
-            if three_column:
-                ws.column_dimensions[get_column_letter(1)].width = (
-                    _EVENT_COLUMN_WIDTH * 2
-                )
-                ws.column_dimensions[get_column_letter(2)].width = _NAME_COLUMN_WIDTH
-                ws.column_dimensions[get_column_letter(2)].width = (
-                    _EVENT_COLUMN_WIDTH * 2
-                )
-            else:
-                ws.column_dimensions[get_column_letter(1)].width = _EVENT_COLUMN_WIDTH
-                ws.column_dimensions[get_column_letter(2)].width = _EVENT_COLUMN_WIDTH
-                ws.column_dimensions[get_column_letter(3)].width = _NAME_COLUMN_WIDTH
-                ws.column_dimensions[get_column_letter(4)].width = _EVENT_COLUMN_WIDTH
-                ws.column_dimensions[get_column_letter(5)].width = _EVENT_COLUMN_WIDTH
-
-            # header
-            if three_column:
-                ws.cell(row=1, column=1, value="W/M")
-                ws.cell(row=1, column=2, value=f"Session {s.number}")
-                ws.cell(row=1, column=3, value="W/M")
-            else:
-                ws.cell(row=1, column=1, value="W")
-                ws.cell(row=1, column=2, value="H")
-                ws.cell(row=1, column=3, value=f"Session {s.number}")
-                ws.cell(row=1, column=4, value="M")
-                ws.cell(row=1, column=5, value="H")
+            ws: Worksheet = self._cheat_sheet_setup(s, three_column)
 
             cs: CheatSheet = CheatSheet(s)
 
@@ -140,29 +184,7 @@ class ExcelWorkbook:
                     ws.cell(row=index, column=1, value=line.event_name)
 
                 else:
-                    if three_column:
-                        ws.cell(
-                            row=index,
-                            column=1,
-                            value=self._get_line(
-                                str(line.womems_ev_num), str(line.mens_event_num)
-                            ),
-                        )
-                        ws.cell(row=index, column=2, value=line.event_name)
-                        ws.cell(
-                            row=index,
-                            column=3,
-                            value=self._get_line(
-                                str(line.womens_heat_count), str(line.mens_heat_count)
-                            ),
-                        )
-
-                    else:
-                        ws.cell(row=index, column=1, value=line.womems_ev_num)
-                        ws.cell(row=index, column=2, value=line.womens_heat_count)
-                        ws.cell(row=index, column=3, value=line.event_name)
-                        ws.cell(row=index, column=4, value=line.mens_event_num)
-                        ws.cell(row=index, column=5, value=line.mens_heat_count)
+                    self._write_cheat_sheet_line(ws, three_column, index, line)
 
                 # add border
                 for c in range(1, (max_column + 1)):
@@ -181,9 +203,17 @@ class ExcelWorkbook:
 
                         ws.cell(row=r, column=c).font = _FONT_STYLE
 
-                # add border around the whole thing
+                # Make copies of the cheat sheet assembled above two more times.
+                start: int = 1
+                end: int = max_column + 1
+                for i in range(2):
+                    ExcelWorkbook.copy_columns(ws, start, end, end + 1)
+                    start = end + 1
+                    end += max_column + 1
 
     def make_event_durations(self, sessions: list[Session]):
+        """Prints seperate report tab that gives timing
+        information for every event in each session"""
 
         unmerged_sessions = (s for s in sessions if not s.merged_session)
 
@@ -214,9 +244,9 @@ class ExcelWorkbook:
                 line2: str = f"h={s.events[i].heat_count}"
                 line3: str = (
                     f"E{s.events[i].number} "
-                    + f"{CheatSheet.short_gender(s.events[i].gender)} "
+                    + f"{short_gender(s.events[i].gender)} "
                     + f"{s.events[i].distance} "
-                    + f"{CheatSheet.short_event(s.events[i].stroke)}"
+                    + f"{short_event(s.events[i].stroke)}"
                     + f"{' Relay' if s.events[i].is_relay else ''}"
                 )
 
@@ -228,31 +258,17 @@ class ExcelWorkbook:
             # add a single row space before each column
             row += 1
 
-    def _get_hours_mins(
-        self, start_time: datetime, end_time: datetime
-    ) -> tuple[int, int]:
-
-        time_delta: timedelta = end_time - start_time
-        delta_seconds: int = int(time_delta.total_seconds())
-        minutes: int = delta_seconds // 60
-        hours: int = minutes // 60
-
-        # works whether hours >= 0
-        remainder_minutes: int = minutes - (hours * 60)
-
-        return (hours, remainder_minutes)
-
-
-"""
-   def make_session_diagnostics(self, sessions: list[Session]):
+    def make_session_diagnostics(self, sessions: list[Session]):
+        """Prints seperate report tab that gives timing and pool information
+        per sessoion"""
 
         unmerged_sessions = (s for s in sessions if not s.merged_session)
 
         ws = self._create_unique_sheet("Diagnostics")
 
-        fontStyleHeader = Font(bold=True)
+        font_style_header = Font(bold=True)
 
-        redFill = PatternFill(
+        red_fill = PatternFill(
             start_color="FF0000", end_color="FF0000", fill_type="solid"
         )
 
@@ -269,14 +285,11 @@ class ExcelWorkbook:
         ]
         header_widths: list[int] = [10, 10, 10, 10, 10, 10, 10, 10, 20]
 
-        # the two arrays above should stay the same length
-        assert len(header_names) == len(header_names)
-
         # header
-        for j in range(len(headerName)):
-            ws.cell(1, j + 1, value=headerName[j])
-            ws.column_dimensions[get_column_letter(j + 1)].width = headerWidth[j]
-            ws.cell(1, j + 1).font = fontStyleHeader
+        for j in range(len(header_names)):
+            ws.cell(1, j + 1, value=header_names[j])
+            ws.column_dimensions[get_column_letter(j + 1)].width = header_widths[j]
+            ws.cell(1, j + 1).font = font_style_header
             ws.cell(1, j + 1).alignment = Alignment(vertical="center")
 
         # write all session data
@@ -285,76 +298,153 @@ class ExcelWorkbook:
             splashes = 0
 
             # count all session heats and entries (aka 'splashes')
-            for e in s.event:
-                heats += e.heatCount
-                splashes += e.totalEntries
+            for e in s.events:
+                heats += e.heat_count
+                splashes += e.total_entries
 
-            (hours, minutes) = self._get_hours_mins(s.datetimeStart, s.datetimeFinish)
+            (hours, minutes) = get_delta_time_HM(s.datetime_start, s.datetime_finish)
 
             ws.cell(row, 1, value=f"{s.number}")
-            ws.cell(row, 2, value=f"{s.poolSize}")
+            ws.cell(row, 2, value=f"{s.pool_size}")
             ws.cell(row, 3, value=f"{heats}")
             ws.cell(row, 4, value=f"{splashes}")
             ws.cell(row, 5, value=f"{s.interval}")
-            ws.cell(row, 6, value=f"{s.plusBackInterval}")
-
+            ws.cell(row, 6, value=f"{s.plus_back_interval}")
             ws.cell(row, 7, value=f"{hours}h {minutes}m")
 
-            if s.last12Uevent is not None:
-                final12U: int = s.event.index(s.last12Uevent)
-                endTime12U: datetime
+            if s.last_12U_event is not None:
+                final_12U_index: int = s.last_12U_event
 
-                # is it the final event in the session
+                # is the final event in the session
                 # if so, the final 12U is the session end time
-                # len()-1 == last index
-                if final12U == len(s.event) - 1:
-                    endTime12U = s.datetimeFinish
+                if final_12U_index == len(s.events) - 1:
+                    end_time_12U = s.datetime_finish
                 else:
                     # else, the final time is the start time of the
                     # event following the final 12U event
-                    final12U += 1
-                    endTime12U = s.event[final12U].datetimeStart
+                    end_time_12U = s.events[final_12U_index + 1].datetime_start
 
-                (hours, minutes) = getHoursMins(s.datetimeStart, endTime12U)
+                (hours, minutes) = get_delta_time_HM(s.datetime_start, end_time_12U)
 
                 ws.cell(row, 8, value=f"{hours}h {minutes}m")
                 ws.cell(
                     row,
                     9,
-                    value=f"E{s.event[final12U].number} "
-                    f"{s.event[final12U].distance} "
-                    f"{shortEvent(s.event[final12U].name)}",
+                    value=f"E{s.events[final_12U_index].number} "
+                    f"{s.events[final_12U_index].distance} "
+                    f"{short_event(s.events[final_12U_index].stroke)}",
                 )
 
-                # if the 12U finish time is greater than 4-hours
+                # If the 12U finish time is greater than 4-hours, flag
+                # the session as a possible 4-hour violation.  This tool
+                # cannot detrmine whether this is a championship meet and
+                # therefore does need to comply
                 if hours >= 4:
-                    cellToColor = ws.cell(row, 8)
-                    cellToColor.fill = redFill
+                    ws.cell(row, 8).fill = red_fill
 
-                    # count 12U heats
-                    heats12U: int = 0
-                    for i in range(final12U + 1):
-                        heats12U += s.event[i].heatCount
+                    # count heats within 12U window
+                    heats: int = 0
+                    for i in range(final_12U_index + 1):
+                        heats += s.events[i].heat_count
 
-                    savedMin: int = (heats12U * 5) // 60
-                    line: str = f"12U Heats {heats12U}, 5-sec saves {savedMin}-min"
+                    # how much time can we save dropping the interval by 5-seoncds?
+                    saved_min: int = (heats * 5) // 60
+                    line: str = f"12U Heats {heats}, 5-sec saves {saved_min}-min"
                     ws.cell(row, 10, value=line)
-"""
+
+    @staticmethod
+    def copy_columns(ws, start_col: int, end_col: int, destination_col: int) -> None:
+        """Copy columns, including values, formatting, merged cells, and widths.
+        Borders require a little bit more work to keep track off when cells are merged"""
+
+        offset = destination_col - start_col
+
+        # Copy column widths
+        for source_col in range(start_col, end_col + 1):
+            source_letter = ws.cell(row=1, column=source_col).column_letter
+            destination_letter = ws.cell(
+                row=1,
+                column=source_col + offset,
+            ).column_letter
+
+            ws.column_dimensions[destination_letter].width = ws.column_dimensions[
+                source_letter
+            ].width
+
+        # Copy merged ranges and their borders
+        for merged_range in list(ws.merged_cells.ranges):
+            if start_col <= merged_range.min_col and merged_range.max_col <= end_col:
+                new_min_col = merged_range.min_col + offset
+                new_max_col = merged_range.max_col + offset
+
+                # Save the borders before merging.
+                borders = {}
+
+                for row in range(merged_range.min_row, merged_range.max_row + 1):
+                    for col in range(merged_range.min_col, merged_range.max_col + 1):
+                        cell = ws.cell(row=row, column=col)
+                        borders[(row, col)] = copy(cell.border)
+
+                # Create the merged range.
+                ws.merge_cells(
+                    start_row=merged_range.min_row,
+                    end_row=merged_range.max_row,
+                    start_column=new_min_col,
+                    end_column=new_max_col,
+                )
+
+                # Restore the borders on the copied range.
+                for (row, col), border in borders.items():
+                    new_cell = ws.cell(
+                        row=row,
+                        column=col + offset,
+                    )
+                    new_cell.border = copy(border)
+
+        # Copy cells
+        for row in ws.iter_rows():
+            for cell in row[start_col - 1 : end_col]:
+                if isinstance(cell, MergedCell):
+                    continue
+
+                new_cell = ws.cell(
+                    row=cell.row,
+                    column=cell.column + offset,
+                )
+
+                new_cell.value = cell.value
+
+                if cell.has_style:
+                    new_cell._style = copy(cell._style)
+
+                if cell.hyperlink:
+                    new_cell._hyperlink = copy(cell.hyperlink)
+
+                if cell.comment:
+                    new_cell.comment = copy(cell.comment)
+
 
 if __name__ == "__main__":
+    # Delete me sooon
+    # this is for initial testing
+
     m: Meet = Meet(r".\tests\timeline_001.pdf")
+
+    m.merge_sessions()
 
     wb: ExcelWorkbook = ExcelWorkbook()
 
     wb.make_cheat_sheets(m.sessions)
     wb.make_cheat_sheets(m.sessions, True)
     wb.make_event_durations(m.sessions)
+    wb.make_session_diagnostics(m.sessions)
 
     wb.write("out.xlsx")
 
     # TODO
     # 1) Other sheets
     # A)   Event timeline  -- done,
-    # B)   Four Hour check -- his can be added
+    # B)   Four Hour check -- done,
     # C)   Seeding
     # 2) everything after merging
+    # 3) set pool size - defaults to 8
