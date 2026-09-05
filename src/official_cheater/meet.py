@@ -54,8 +54,6 @@ class Meet:
 
                 # capture every event listed for the session
                 elif match := report.TIMELINE_EVENT.search(line):
-                    print("NEW EVENT") if self.debug else None  # DEBUG
-
                     start_time: datetime = datetime.strptime(
                         f"{match.group(10)}", report.TIME_FORMAT
                     )

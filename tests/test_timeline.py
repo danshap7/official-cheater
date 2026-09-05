@@ -37,7 +37,6 @@ def test_003(monkeypatch):
         "argv",
         [
             "official-cheater",
-            "--debug",
             "timeline",
             r".\tests\timeline_003_staggered_events-ligature_issue_in_fly.pdf",
         ],
@@ -52,7 +51,6 @@ def test_004(monkeypatch):
         "argv",
         [
             "official-cheater",
-            "--debug",
             "timeline",
             r".\tests\timeline_004_has_spaces_between_genders.pdf",
         ],
@@ -68,8 +66,10 @@ def test_005(monkeypatch):
         [
             "official-cheater",
             "timeline",
-            "--merge",
             r".\tests\timeline_001.pdf",
+            "--merge",
+            "--output",
+            r".\tests\timeline_001.out.xlsx",
         ],
     )
 

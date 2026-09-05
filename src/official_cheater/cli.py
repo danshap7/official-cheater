@@ -93,6 +93,27 @@ def build_timeline_parser(subparsers):
         type=Path,
         help="MS Excel report name (default name is <input>+.xls)",
     )
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--5column",
+        dest="cheat_layout",
+        action="store_const",
+        const="5column",
+        help="Five column cheat sheet layout",
+    )
+
+    group.add_argument(
+        "--3column",
+        dest="cheat_layout",
+        action="store_const",
+        const="3column",
+        help="Three column cheat sheet layout",
+    )
+
+    # 5 column layout is always the default
+    parser.set_defaults(cheat_layout="5column")
+
     parser.set_defaults(func=run_timeline)
 
 

@@ -9,7 +9,6 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from .cheat_sheet import CheatSheet, SheetLine
-from .meet import Meet
 from .session import Session
 from .utilities import get_delta_time_HM, short_event, short_gender
 
@@ -217,7 +216,20 @@ class ExcelWorkbook:
 
         unmerged_sessions = (s for s in sessions if not s.merged_session)
 
+        fill_yellow = PatternFill(
+            start_color="FFFFCC", end_color="FFFFCC", fill_type="lightDown"
+        )
+
+        fill_blue = PatternFill(
+            start_color="DDEBF7", end_color="DDEBF7", fill_type="lightDown"
+        )
+
         ws = self._create_unique_sheet("Duration")
+
+        # set column widths
+        header_widths: list[int] = [10, 10, 50]
+        for j in range(len(header_widths)):
+            ws.column_dimensions[get_column_letter(j + 1)].width = header_widths[j]
 
         # 'row' always points to the first row to be written to
         row: int = 1
@@ -231,28 +243,43 @@ class ExcelWorkbook:
             for i in range(len(s.events)):
                 start_time = s.events[i].datetime_start
 
-                # use session end for the final event stop time
-                if i == len(s.events) - 1:
-                    finish_time: datetime = s.datetime_finish
+                if i > 0 and s.events[i - 1].break_follows:
+                    ws.cell(
+                        row=row_offset + i,
+                        column=1,
+                        value=f"{s.events[i - 1].break_time}-min",
+                    )
+                    ws.cell(row=row_offset + i, column=2, value="")
+                    ws.cell(row=row_offset + i, column=3, value="BREAK")
+                    ws.cell(row=row_offset + i, column=3).fill = fill_blue
+
                 else:
-                    finish_time = s.events[i + 1].datetime_start
+                    # use session end for the final event stop time
+                    if i == len(s.events) - 1:
+                        finish_time: datetime = s.datetime_finish
+                    else:
+                        finish_time = s.events[i + 1].datetime_start
 
-                event_duration: timedelta = finish_time - start_time
-                delta_in_minutes: int = round(event_duration.total_seconds() / 60)
+                    event_duration: timedelta = finish_time - start_time
+                    delta_in_minutes: int = round(event_duration.total_seconds() / 60)
 
-                line1: str = f"{delta_in_minutes}-min "
-                line2: str = f"h={s.events[i].heat_count}"
-                line3: str = (
-                    f"E{s.events[i].number} "
-                    + f"{short_gender(s.events[i].gender)} "
-                    + f"{s.events[i].distance} "
-                    + f"{short_event(s.events[i].stroke)}"
-                    + f"{' Relay' if s.events[i].is_relay else ''}"
-                )
+                    line1: str = f"{delta_in_minutes}-min "
+                    line2: str = f"h={s.events[i].heat_count}"
+                    line3: str = (
+                        f"E{s.events[i].number} "
+                        + f"{short_gender(s.events[i].gender)} "
+                        + f"{s.events[i].distance} "
+                        + f"{short_event(s.events[i].stroke)}"
+                        + f"{' Relay' if s.events[i].is_relay else ''}"
+                    )
 
-                ws.cell(row=row_offset + i, column=1, value=line1)
-                ws.cell(row=row_offset + i, column=2, value=line2)
-                ws.cell(row=row_offset + i, column=3, value=line3)
+                    ws.cell(row=row_offset + i, column=1, value=line1)
+                    ws.cell(row=row_offset + i, column=2, value=line2)
+                    ws.cell(row=row_offset + i, column=3, value=line3)
+
+                    if s.events[i].is_relay:
+                        ws.cell(row=row_offset + i, column=3).fill = fill_yellow
+
                 row += 1
 
             # add a single row space before each column
@@ -279,11 +306,13 @@ class ExcelWorkbook:
             "Splashes",
             "Interval",
             "+ Back",
+            "Relays",
+            "Breaks",
             "Time",
             "12U Finish",
             "12U End Event",
         ]
-        header_widths: list[int] = [10, 10, 10, 10, 10, 10, 10, 10, 20]
+        header_widths: list[int] = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 20]
 
         # header
         for j in range(len(header_names)):
@@ -296,11 +325,15 @@ class ExcelWorkbook:
         for row, s in enumerate(unmerged_sessions, start=2):
             heats = 0
             splashes = 0
+            relays = 0
+            breaks = 0
 
             # count all session heats and entries (aka 'splashes')
             for e in s.events:
                 heats += e.heat_count
                 splashes += e.total_entries
+                relays += e.is_relay
+                breaks += e.break_follows
 
             (hours, minutes) = get_delta_time_HM(s.datetime_start, s.datetime_finish)
 
@@ -310,7 +343,9 @@ class ExcelWorkbook:
             ws.cell(row, 4, value=f"{splashes}")
             ws.cell(row, 5, value=f"{s.interval}")
             ws.cell(row, 6, value=f"{s.plus_back_interval}")
-            ws.cell(row, 7, value=f"{hours}h {minutes}m")
+            ws.cell(row, 7, value=f"{relays}")
+            ws.cell(row, 8, value=f"{breaks}")
+            ws.cell(row, 9, value=f"{hours}h {minutes}m")
 
             if s.last_12U_event is not None:
                 final_12U_index: int = s.last_12U_event
@@ -326,10 +361,10 @@ class ExcelWorkbook:
 
                 (hours, minutes) = get_delta_time_HM(s.datetime_start, end_time_12U)
 
-                ws.cell(row, 8, value=f"{hours}h {minutes}m")
+                ws.cell(row, 10, value=f"{hours}h {minutes}m")
                 ws.cell(
                     row,
-                    9,
+                    11,
                     value=f"E{s.events[final_12U_index].number} "
                     f"{s.events[final_12U_index].distance} "
                     f"{short_event(s.events[final_12U_index].stroke)}",
@@ -340,7 +375,7 @@ class ExcelWorkbook:
                 # cannot detrmine whether this is a championship meet and
                 # therefore does need to comply
                 if hours >= 4:
-                    ws.cell(row, 8).fill = red_fill
+                    ws.cell(row, 10).fill = red_fill
 
                     # count heats within 12U window
                     heats: int = 0
@@ -350,7 +385,7 @@ class ExcelWorkbook:
                     # how much time can we save dropping the interval by 5-seoncds?
                     saved_min: int = (heats * 5) // 60
                     line: str = f"12U Heats {heats}, 5-sec saves {saved_min}-min"
-                    ws.cell(row, 10, value=line)
+                    ws.cell(row, 12, value=line)
 
     @staticmethod
     def copy_columns(ws, start_col: int, end_col: int, destination_col: int) -> None:
@@ -422,29 +457,3 @@ class ExcelWorkbook:
 
                 if cell.comment:
                     new_cell.comment = copy(cell.comment)
-
-
-if __name__ == "__main__":
-    # Delete me sooon
-    # this is for initial testing
-
-    m: Meet = Meet(r".\tests\timeline_001.pdf")
-
-    m.merge_sessions()
-
-    wb: ExcelWorkbook = ExcelWorkbook()
-
-    wb.make_cheat_sheets(m.sessions)
-    wb.make_cheat_sheets(m.sessions, True)
-    wb.make_event_durations(m.sessions)
-    wb.make_session_diagnostics(m.sessions)
-
-    wb.write("out.xlsx")
-
-    # TODO
-    # 1) Other sheets
-    # A)   Event timeline  -- done,
-    # B)   Four Hour check -- done,
-    # C)   Seeding
-    # 2) everything after merging
-    # 3) set pool size - defaults to 8
