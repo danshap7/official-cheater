@@ -66,6 +66,12 @@ def build_stamp_parser(subparsers):
         help="Stamp at the last page of the event",
     )
 
+    parser.add_argument(
+        "--print",
+        action="store_true",
+        help="Print file to default printer",
+    )
+
     parser.set_defaults(func=run_stamp)
 
 

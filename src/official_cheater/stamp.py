@@ -3,7 +3,7 @@
 import sys
 from io import BytesIO
 from pathlib import Path
-
+import os
 import pymupdf
 from PIL import Image, ImageChops
 from pypdf import PageObject, PdfReader, PdfWriter
@@ -257,3 +257,6 @@ def run_stamp(args) -> None:
     stamp_file(
         args.base_file, args.overlay_all, args.overlay_event, stamp_first, args.output
     )
+
+    if args.print:
+        os.startfile(str(args.output), "print") 
